@@ -1,13 +1,26 @@
-# EYMEN GELİR – Yol Haritası
-1. [x] SVG / PNG simge paketinin hazırlanması
-2. [x] Görsel ekran ve açık tema tasarımları
-3. [x] README, MIT lisansı ve Muhammet Atasoy imzası
-4. [x] Güncelleme bildirimi önizlemesi
-5. [ ] Kotlin / Jetpack Compose Android uygulama iskeleti
-6. [ ] Gelir, gider, kategori, açıklama ekranları + Room
-7. [ ] Aylık ve yıllık rapor, bütçe ve grafikler
-8. [ ] Fiş/fatura ekleme, aylık ZIP yedek / geri yükleme
-9. [ ] GitHub Releases güncelleme kontrolü ve Android bildirimleri
-10. [ ] Testler, güvenli sürüm yükseltme, imzalı APK dağıtımı
+# EYMEN GELİR — Geliştirme Planı
 
-Not: Tasarımda tamamlanmış maddeler gerçek uygulama özelliği tamamlandı anlamına gelmez.
+## 1. Tamamlananlar (v0.1.0)
+- [x] SVG/PNG simge ve tasarım paketleri
+- [x] Türkçe README, MIT lisansı, Muhammet Atasoy imzası
+- [x] Kotlin/Jetpack Compose/Material 3 Android projesi
+- [x] Açık renkli ana ekran ve alt menüler
+- [x] Room veritabanına çevrimdışı gelir/gider kayıtları
+- [x] Kategori seçme, özel kategori ekleme
+- [x] Tarih, açıklama ve tutar alanı
+- [x] İşlem düzenleme ve silme
+- [x] Aylık ve yıllık gelir/gider raporları
+- [x] Hakkında, sürüm bilgisi ve GitHub sürüm kontrolü
+- [x] GitHub Actions birim testleri ve debug APK derlemesi
+- [x] Başarılı APK derlemesi: https://github.com/mmustafatasoy/Gelirgider/actions/runs/41671869636
+
+## 2. Geliştirme aşamaları
+- [ ] Aylık ZIP dışa aktarımı; JSON şeması ve doğrulama
+- [ ] ZIP'den güvenli geri yükleme; mükerrer kayıt kontrolü
+- [ ] Fiş ve fatura fotoğrafı ekleme
+- [ ] Tekrarlayan faturalar ve bütçe hedefleri
+- [ ] Android bildirim kanalı ve isteğe bağlı bildirimler
+- [ ] İmzalı sürüm anahtarı ve güncellenebilir release APK
+- [ ] Uygulama içi ek testler, erişilebilirlik ve gerçek cihaz testi
+
+**Test güvenliği:** Test APK'sına gerçek/tek kopya finans verileri kaydetmeyin; henüz ZIP yedekleme bulunmuyor.

@@ -1,37 +1,61 @@
-# EYMEN GELİR
+# 🏡 EYMEN GELİR
 
-**EYMEN GELİR**, aile bütçesinin aylık ve yıllık gelir/gider takibi için geliştirilen Türkçe, çevrimdışı öncelikli Android uygulaması projesidir.
+**EYMEN GELİR** — aile bütçesi için Türkçe, çevrimdışı çalışan gelir-gider takip uygulaması.
 
-> **Geliştirme durumu:** v0.1 tasarım ve proje iskeleti. Henüz APK yayımlanmadı; arayüz örneklerindeki rakamlar gerçek finans verisi değildir.
+**Geliştirici:** Muhammet Atasoy · **Yayıncı:** Atasoy Yazılım · **Lisans:** [MIT](LICENSE)
 
-## Planlanan özellikler
-- Gelir ve gider kaydetme, düzenleme, silme; tarih, kategori, açıklama ve tutar
-- Elektrik, su, doğalgaz, bina aidatı, market, internet, ulaşım ve özel kategoriler
-- 12 aylık yıllık gelir/gider tablosu ve aylık raporlar
-- Bütçe hedefleri, kategori dağılımları ve grafikler
-- Room/SQLite ile çevrimdışı veri saklama, fiş/fatura ekleme
-- Aylık ZIP yedekleri, verileri dışa aktarma ve geri yükleme
-- Hakkında, sürüm bilgisi, güncelleme kontrolü ve bildirim ekranı
-- Açık tema; animasyonlu ve erişilebilir simgeler
+## ✅ Android uygulamasının ilk sürümü (v0.1.0)
 
-## Dosyalar
-- `assets/icons/svg/` — **38 ayrı düzenlenebilir SVG simgesi**
-- `docs/PROJECT_PLAN.md` — uygulama geliştirme planı
-- `docs/UPDATE_SYSTEM.md` — güncelleme bildirimi ve güvenli yükseltme tasarımı
-- `docs/BACKUP_AND_PRIVACY.md` — ZIP yedekleme, geri yükleme ve gizlilik
-- `previews/update-notification.html` — güncelleme kutusunun yalnızca **tasarım önizlemesi**
+Kotlin, Jetpack Compose ve Room kullanılarak ilk **gerçek Android uygulama kaynakları** yazıldı. GitHub Actions ile testler ve APK derlemesi başarıyla tamamlandı.
 
-Ayrıca simgelerin PNG 128/256/512 sürümlerini içeren ayrı ZIP paket hazırlanmıştır; GitHub deposunda şu an SVG kaynakları bulunur.
+**Başarılı derleme ve test APK'sı:**
+https://github.com/mmustafatasoy/Gelirgider/actions/runs/41671869636
 
-## Teknik yaklaşım
-Kotlin, Jetpack Compose/Material 3, Room/SQLite, Storage Access Framework, GitHub Releases sürüm denetimi. Bildirim ve gerçek güncelleme işlemleri Android kodlama aşamasında eklenecektir.
+Derleme sayfasını açıp **Artifacts → EYMEN-GELIR-debug-apk** üzerinden ZIP'i indir; ZIP içindeki `app-debug.apk` dosyasını telefona yükle. GitHub artefakt indirmesi için giriş gerekebilir.
 
-## Lisans
-MIT. Bkz. [LICENSE](LICENSE).
+### ✅ İlk sürümde çalışanlar
+- Ana sayfa; seçilen ayın gelir, gider ve kalan bütçe bilgileri
+- Yeni gelir / gider girişi: kategori, Türk lirası tutar, açıklama, tarih
+- İşlem listesini ay bazında ve gelir/gider filtresiyle görüntüleme
+- İşlemleri düzenleme, onayla silme
+- Elektrik, su, doğalgaz, bina aidatı, market, internet, ulaşım ve diğer kategoriler
+- Kullanıcıya özel gelir/gider kategorisi oluşturma
+- Aylık raporda kategorilerin gider payı; yıllık raporda 12 ayın gelir/gider/kalan özeti
+- Room/SQLite ile telefona kalıcı kayıt; internet gerektirmeyen temel kullanım
+- Hakkında, sürüm bilgisi ve GitHub Releases sürüm kontrolü
+- Açık renkli tema ve hareketli uygulama simgesi
 
-## Geliştirici
+### 🚧 Sıradaki işler
+- Her aya özel ZIP yedekleme, güvenli geri yükleme, dışa aktarma
+- Fiş/fatura fotoğrafı ekleme
+- Tekrarlayan ödemeler ve planlı gider bildirimleri
+- Bütçe hedefleri, daha kapsamlı grafikler
+- Resmî Android bildirimleri ve periyodik güncelleme denetimi
+- Kalıcı imzalama anahtarıyla güvenilir sürüm güncelleme; Play Store hazırlığı
+
+### ⚠️ Test APK'sı hakkında önemli not
+Bu bir **debug/test APK** dosyasıdır, Google Play'e sunulmuş bir sürüm değildir. Her GitHub Actions derlemesi farklı geçici debug anahtarıyla imzalanabilir, bu yüzden yeni test APK'sı eski test APK'sının üzerine kurulamayabilir. **ZIP yedekleme ve geri yükleme tamamlanmadan uygulamayı gerçek/tek kopya finans verilerinizi saklamak için kullanmayın.** Uygulamayı silmek, yerel veritabanını da silebilir.
+
+## 🔧 Teknik bilgiler
+- Uygulama kimliği: `com.eymen.gelir`
+- Kotlin / Jetpack Compose / Material 3
+- Room 2.8.5 + KSP; tutarlar kuruş cinsinden `Long` olarak kaydedilir
+- `minSdk 26` / `targetSdk 36` / `compileSdk 36`
+- GitHub Actions iş akışı: `.github/workflows/android.yml`
+- GitHub sürüm denetimi: `https://api.github.com/repos/mmustafatasoy/Gelirgider/releases/latest`
+- Dağıtım: Android test APK'sı (GitHub Actions). Henüz resmî Release yayımlanmadı.
+
+## 🎨 Varlıklar ve belgeler
+- `assets/icons/svg/`: 38 bağımsız SVG simgesi
+- `previews/update-notification.html`: tasarım amaçlı güncelleme bildirim kutusu
+- `docs/DESIGN_GUIDE.md`: tema ve arayüz
+- `docs/PROJECT_PLAN.md`: geliştirme yol haritası
+- `docs/BACKUP_AND_PRIVACY.md`: planlanan yedekleme / gizlilik
+- `docs/UPDATE_SYSTEM.md`: sürüm denetimi tasarımı
+
+## ⚖️ Lisans ve imza
+MIT lisanslı açık kaynak proje. © 2026 **Muhammet Atasoy**.
+
 **Muhammet Atasoy**  
-**Atasoy Yazılım**  
+*Atasoy Yazılım*  
 https://atasoyyazilim.com
-
-© 2026 Muhammet Atasoy.
