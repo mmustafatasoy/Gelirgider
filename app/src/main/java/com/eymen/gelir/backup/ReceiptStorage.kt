@@ -98,8 +98,8 @@ object ReceiptStorage {
     }
 
     fun isJpeg(bytes: ByteArray): Boolean =
-        bytes.size >= 4 && bytes[0].toInt() and 255 == 255 &&
-            bytes[1].toInt() and 255 == 216 &&
-            bytes[bytes.lastIndex - 1].toInt() and 255 == 255 &&
-            bytes[bytes.lastIndex].toInt() and 255 == 217
+        bytes.size >= 4 && (bytes[0].toInt() and 255) == 255 &&
+            (bytes[1].toInt() and 255) == 216 &&
+            (bytes[bytes.lastIndex - 1].toInt() and 255) == 255 &&
+            (bytes[bytes.lastIndex].toInt() and 255) == 217
 }
