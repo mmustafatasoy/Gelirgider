@@ -32,6 +32,14 @@ jobs:
         run: gradle --no-daemon :app:testDebugUnitTest
       - name: Assemble debug APK
         run: gradle --no-daemon :app:assembleDebug
+      - name: Assemble unsigned production APK
+        run: gradle --no-daemon :app:assembleRelease
+      - name: Upload unsigned release APK for local private-key signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: EYMEN-GELIR-v0.6.0-UNSIGNED-RELEASE
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
       - name: Upload installable debug APK
         uses: actions/upload-artifact@v4
         with:
