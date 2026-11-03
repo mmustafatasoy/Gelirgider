@@ -4,7 +4,7 @@
 
 **Geliştirici:** Muhammet Atasoy · **Yayıncı:** Atasoy Yazılım · **Lisans:** [MIT](LICENSE)
 
-## ✅ Android uygulaması v0.6.0 — Kira, Telefon, Gönderilen Paralar ve İmzalı Release Hazırlığı
+## ✅ Android uygulaması v0.6.1 — Kurtarma Kodu Sıfırlama Düzeltmesi
 
 Kotlin, Jetpack Compose ve Room kullanılarak ilk **gerçek Android uygulama kaynakları** yazıldı. GitHub Actions ile testler ve APK derlemesi başarıyla tamamlandı.
 
@@ -17,12 +17,16 @@ https://github.com/mmustafatasoy/Gelirgider/actions/runs/41678303239
 **v0.5.0 önceki test APK:**
 https://github.com/mmustafatasoy/Gelirgider/actions/runs/41680420362
 
-**v0.6.0 başarılı TEST APK:**
+**v0.6.0 eski TEST APK:**
 https://github.com/mmustafatasoy/Gelirgider/actions/runs/41684805044
 
 **İmzalı kararlı Release (henüz yayımlanmadı):** GitHub Secrets ayarları ve manuel yayın çalışması gerekir. [Adımlar](docs/SIGNED_RELEASE.md).
 
 Derleme sayfasını açıp **Artifacts → EYMEN-GELIR-debug-apk** üzerinden ZIP'i indir; ZIP içindeki `app-debug.apk` dosyasını telefona yükle. GitHub artefakt indirmesi için giriş gerekebilir.
+
+**v0.6.1:** Kurtarma kodunu kopyalarken başına gelen `1.`, `2)` gibi numaralar ve farklı tire/boşluk biçimleri artık kabul ediliyor. Kurtarma kodu ekranındaki sıra numaraları seçilecek kod metninden ayrıldı. Başarılı sıfırlama sonrasında geçici şifre otomatik olarak giriş alanına dolduruluyor. İlk kayıt, bir defalık kod tüketimi, yanlış kullanıcı adı, şifre sıfırlama ve yeni şifreyle giriş Robolectric testleriyle kontrol edildi.
+
+**v0.6.1 doğrulanan imzalı APK:** Bu konuşmada `EYMEN-GELIR-v0.6.1-IMZALI-RELEASE.apk` olarak sunuldu; GitHub Releases'e yüklenmiş değildir. v0.6.0 imzalı sürüm ile aynı imzalama sertifikası kullanıldı. Bu düzeltme hesap verilerini silmez. Test APK'larından geçişte imza farklı olduğundan kurulum için veri yedeği gerekebilir.
 
 ### ✅ Uygulamada bulunan özellikler
 - Ana sayfa; seçilen ayın gelir, gider ve kalan bütçe bilgileri

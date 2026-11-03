@@ -1,5 +1,14 @@
 # EYMEN GELİR — Sürüm Geçmişi
 
+## v0.6.1 (3 Kasım 2026) — Kurtarma Kodu Düzeltmesi
+- Kurtarma kodu kopyalama ekranında sıra numarası ayrı metin olarak gösterilir.
+- `1. KOD`, `2) KOD`, farklı Unicode tireleri, boşluklar ve küçük harfler kabul edilir.
+- Kod başarıyla kullanıldığında geçici şifre otomatik doldurulur; ardından yeni parola zorunludur.
+- Android SharedPreferences hesabının kurtarma akışı Robolectric testleriyle kontrol edildi.
+- GitHub Actions: birim testleri, debug APK ve imzasız release derlemesi başarılı (https://github.com/mmustafatasoy/Gelirgider/actions/runs/41688600818).
+- Ayrı olarak önceki v0.6.0 imzalı APK'nın üretim sertifikasıyla imzalı v0.6.1 APK oluşturulup kriptografik doğrulandı.
+- Yeni sürüm GitHub Releases'e henüz yayımlanmadı.
+
 ## v0.6.0 (3 Kasım 2026)
 - Kira, Turkcell, Vodafone, Türk Telekom, diğer telefon ve Gönderilen Para kategorileri.
 - Gönderilen Para için alıcı adı; kişi bazında özet, arama ve geçmiş ekranı.
