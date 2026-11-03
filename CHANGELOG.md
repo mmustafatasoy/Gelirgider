@@ -1,5 +1,13 @@
 # EYMEN GELİR — Sürüm Geçmişi
 
+## v0.5.0 (3 Kasım 2026)
+- Animasyonlu donut grafik ve detaylı yan menü.
+- Tek cihazlık sunucusuz yerel hesap: kullanıcı adı, güçlü parola türetme, doğrulama.
+- 8 tek kullanımlık kurtarma kodu, otomatik rastgele geçici şifre ve zorunlu parola sıfırlama.
+- Oturum kilitleme ve mevcut şifreyle kurtarma kodlarını yeniden üretme.
+- Finans veritabanının şifresiz olduğu açıkça belgelenmiştir.
+- Test APK: GitHub Actions sonucuna göre ayrıca doğrulanacak.
+
 ## v0.4.0 (3 Kasım 2026)
 - Aylık tekrar eden kategori bütçeleri ve limit kullanım oranları.
 - Kategori harcaması bütçenin %80'ine ve %100'üne ulaşınca uygulama içinde uyarı.

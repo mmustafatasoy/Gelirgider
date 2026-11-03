@@ -14,6 +14,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.eymen.gelir.auth.LocalAccountGate
+import com.eymen.gelir.auth.LocalAccountStore
+import com.eymen.gelir.auth.LocalAccountSettings
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -114,7 +123,11 @@ private val dateZone = ZoneId.systemDefault()
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { EymenApp() }
+        setContent {
+            LocalAccountGate { username, lock ->
+                EymenApp(signedUser = username, onLock = lock)
+            }
+        }
     }
 }
 
@@ -144,13 +157,19 @@ private fun total(entries: List<FinanceEntry>, kind: String): Long =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EymenApp(vm: FinanceViewModel = viewModel()) {
+private fun EymenApp(
+    signedUser: String,
+    onLock: () -> Unit,
+    vm: FinanceViewModel = viewModel()
+) {
     val entries by vm.entries.collectAsState()
     val categories by vm.categories.collectAsState()
     val update by vm.releaseStatus.collectAsState()
     val budgets by vm.budgetLimits.collectAsState()
     val operation by vm.operationStatus.collectAsState()
     val snackbar = remember { SnackbarHostState() }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val drawerScope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableStateOf("HOME") }
     var selectedMonth by remember { mutableStateOf(YearMonth.now()) }
     var newEntryKind by remember { mutableStateOf<String?>(null) }
@@ -167,10 +186,33 @@ private fun EymenApp(vm: FinanceViewModel = viewModel()) {
     }
 
     EymenTheme {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        FinanceDrawerContent(
+                            activeTab = tab,
+                            username = signedUser,
+                            onSelect = { next ->
+                                tab = next
+                                drawerScope.launch { drawerState.close() }
+                            },
+                            onLock = onLock
+                        )
+                    }
+                }
+            }
+        ) {
         Scaffold(
             containerColor = background,
             topBar = {
                 TopAppBar(
+                    navigationIcon = {
+                        TextButton(onClick = { drawerScope.launch { drawerState.open() } }) {
+                            Text("☰", fontSize = 24.sp, color = darkGreen)
+                        }
+                    },
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             AnimatedBrand()
@@ -198,11 +240,11 @@ private fun EymenApp(vm: FinanceViewModel = viewModel()) {
             bottomBar = {
                 NavigationBar(containerColor = Color.White, tonalElevation = 3.dp) {
                     listOf(
-                        Triple("HOME", "⌂", "Ana Sayfa"),
+                        Triple("HOME", "🏠", "Ana Sayfa"),
                         Triple("ENTRIES", "⇄", "İşlemler"),
                         Triple("CATEGORIES", "▦", "Kategoriler"),
-                        Triple("REPORTS", "▥", "Raporlar"),
-                        Triple("SETTINGS", "☰", "Ayarlar")
+                        Triple("REPORTS", "📊", "Raporlar"),
+                        Triple("SETTINGS", "⚙", "Ayarlar")
                     ).forEach { (id, icon, label) ->
                         NavigationBarItem(
                             selected = tab == id,
@@ -237,10 +279,21 @@ private fun EymenApp(vm: FinanceViewModel = viewModel()) {
                     )
                     "CATEGORIES" -> CategoriesScreen(categories, vm)
                     "REPORTS" -> ReportsScreen(entries, selectedMonth, { selectedMonth = it }, vm, categories)
-                    "SETTINGS" -> SettingsScreen(vm, update, selectedMonth, { selectedMonth = it })
+                    "BUDGET" -> Column(Modifier.verticalScroll(rememberScrollState())) {
+                        Text("🎯 Aylık Bütçeler", color = darkGreen, fontWeight = FontWeight.Bold)
+                        MonthSelector(selectedMonth, { selectedMonth = it })
+                        BudgetPlanner(vm, entries, categories, selectedMonth)
+                    }
+                    "REMINDERS" -> Column(Modifier.verticalScroll(rememberScrollState())) {
+                        PaymentReminderPanel(vm)
+                    }
+                    "SETTINGS" -> SettingsScreen(
+                        vm, update, selectedMonth, { selectedMonth = it }, signedUser, onLock
+                    )
                 }
             }
         }
+        } // ModalNavigationDrawer
 
         if (newEntryKind != null || editing != null) {
             EntryDialog(
@@ -346,7 +399,8 @@ private fun HomeScreen(
             SummaryCard("Gider", expense, "🛒", paleRed, Modifier.weight(1f))
             SummaryCard("Kalan", income - expense, "💼", paleBlue, Modifier.weight(1f))
         }
-        Spacer(Modifier.height(16.dp))
+        CircularIncomeExpenseCard(income, expense)
+        Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             Button(onClick = { onAdd("INCOME") }, modifier = Modifier.weight(1f)) { Text("＋ Gelir Ekle") }
             OutlinedButton(onClick = { onAdd("EXPENSE") }, modifier = Modifier.weight(1f)) { Text("＋ Gider Ekle") }
@@ -615,6 +669,7 @@ private fun ReportsScreen(
             Spacer(Modifier.height(18.dp))
             BudgetPlanner(vm, entries, categories, month)
             MonthlyWeeklyTrend(entries, month)
+            CircularIncomeExpenseCard(income, expense)
             HeaderText("Kategori Bazında Giderler")
             val breakdown = current.filter { it.kind == "EXPENSE" }.groupBy { it.category }
             if (breakdown.isEmpty()) {
@@ -643,9 +698,12 @@ private fun SettingsScreen(
     vm: FinanceViewModel,
     update: ReleaseStatus,
     month: YearMonth,
-    onMonthChange: (YearMonth) -> Unit
+    onMonthChange: (YearMonth) -> Unit,
+    signedUser: String,
+    onLock: () -> Unit
 ) {
     val context = LocalContext.current
+    val accountStore = remember(context) { LocalAccountStore(context) }
     val pending by vm.pendingImport.collectAsState()
     val busy by vm.backupBusy.collectAsState()
     var autoFolder by remember { mutableStateOf(MonthlyBackupScheduler.folder(context)) }
@@ -681,6 +739,7 @@ private fun SettingsScreen(
                 Spacer(Modifier.height(14.dp))
                 InfoRow("Yazılım sürümü", "v${BuildConfig.VERSION_NAME}")
                 InfoRow("Geliştirici", "Muhammet Atasoy")
+                InfoRow("Yerel kullanıcı", signedUser)
                 InfoRow("Yayıncı", "Atasoy Yazılım")
                 InfoRow("Veri konumu", "Telefon (çevrimdışı)")
                 InfoRow("Lisans", "MIT")
@@ -770,6 +829,8 @@ private fun SettingsScreen(
         Spacer(Modifier.height(16.dp))
         PaymentReminderPanel(vm)
         Spacer(Modifier.height(18.dp))
+        LocalAccountSettings(accountStore, signedUser, onLock)
+        Spacer(Modifier.height(16.dp))
         HeaderText("🔔 Güncelleme Bildirimi")
         Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = paleGreen)) {
             Column(Modifier.padding(18.dp)) {

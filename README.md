@@ -4,20 +4,27 @@
 
 **Geliştirici:** Muhammet Atasoy · **Yayıncı:** Atasoy Yazılım · **Lisans:** [MIT](LICENSE)
 
-## ✅ Android uygulaması v0.4.0 — Bütçe ve Fatura Hatırlatıcıları
+## ✅ Android uygulaması v0.5.0 — Yerel Hesap, Kurtarma Kodları ve Yuvarlak Grafik
 
 Kotlin, Jetpack Compose ve Room kullanılarak ilk **gerçek Android uygulama kaynakları** yazıldı. GitHub Actions ile testler ve APK derlemesi başarıyla tamamlandı.
 
 **Önceki v0.3.0 başarılı test APK:**
 https://github.com/mmustafatasoy/Gelirgider/actions/runs/41676669873
 
-**v0.4.0 başarılı test APK:**
+**v0.4.0 önceki test APK:**
 https://github.com/mmustafatasoy/Gelirgider/actions/runs/41678303239
+
+**v0.5.0 APK:** GitHub Actions derleme sonucu doğrulandıktan sonra aşağıdaki sürüm bağlantısı güncellenecektir.
 
 Derleme sayfasını açıp **Artifacts → EYMEN-GELIR-debug-apk** üzerinden ZIP'i indir; ZIP içindeki `app-debug.apk` dosyasını telefona yükle. GitHub artefakt indirmesi için giriş gerekebilir.
 
 ### ✅ Uygulamada bulunan özellikler
 - Ana sayfa; seçilen ayın gelir, gider ve kalan bütçe bilgileri
+- Animasyonlu yuvarlak/donut gelir-gider grafiği: gelir/gider payı ve merkezde kalan bütçe
+- Gelişmiş soldan açılır menü: işlemler, raporlar, bütçe, hatırlatıcı, ayarlar, güvenlik
+- İnternet gerektirmeyen **tek cihazlık yerel kullanıcı hesabı**, şifreli giriş ekranı (parola özeti PBKDF2-HMAC-SHA256)
+- İlk kayıt sırasında **8 tek kullanımlık kurtarma kodu**, kodla geçici şifre, ardından zorunlu yeni şifre
+- Hesap ekranından mevcut şifreyi girerek kurtarma kodlarını yeniden oluşturma ve oturumu kilitleme
 - Yeni gelir / gider girişi: kategori, Türk lirası tutar, açıklama, tarih
 - İşlem listesini ay bazında ve gelir/gider filtresiyle görüntüleme
 - İşlemleri düzenleme, onayla silme
@@ -84,3 +91,17 @@ Ayarlar → Yedekleme Merkezi → ayı seç → ZIP olarak dışa aktar. ZIP se�
 **ZIP yedekleri:** v0.4.0 biçim sürümü 3; gelir-gider kayıtları, fiş görselleri, kategoriler, bütçe limitleri ve hatırlatıcı tercihleri birlikte aktarılır. Geri yükleme mevcut işlemleri silmeden yalnızca eksikleri ekler; mevcut kategori bütçeleri korunur. Yedekler hâlâ şifresizdir.
 
 **Güvenlik:** Test APK'sı imzası değişirse eski APK'nın üzerine kurulamayabilir. Eski uygulamayı silmeden önce verilerinizi erişilebilir ayrı bir klasöre yedekleyin. Birim testlerini geçmiş APK, gerçek cihazda kapsamlı test edildiği anlamına gelmez.
+
+
+## 🔐 v0.5.0 — Yerel hesap ve parola kurtarma
+
+1. İlk açılışta **Kayıt Ol**: kullanıcı adı (3–32 karakter), şifre (en az 10 karakter) ve tekrarını gir.
+2. Uygulamanın oluşturduğu **8 ayrı kurtarma kodunu** (24 hex karakter / 96 bit) güvenli bir yere kaydet; kodlar **yalnızca bir kez gösterilir**.
+3. Sonraki başlatmalarda **Giriş Yap** ekranında kullanıcı adı ve şifrenle oturum aç.
+4. Şifren unutulursa **Şifremi Unuttum → kullanıcı adı + kullanılmamış kurtarma kodu**. Kod tüketilir, uygulama rastgele geçici şifre gösterir.
+5. Geçici şifreni ve yeni kalıcı şifreni gir. Bundan sonra **yalnızca yeni şifrenle** giriş yaparsın.
+6. Oturum açıkken Ayarlar → Hesap ve Güvenlik bölümünden mevcut şifreyle **yeni kurtarma kodları** oluşturabilirsin; eskiler geçersizleşir.
+
+**Önemli güvenlik sınırları:** Bu sistem **sunucusuz ve tek cihazlı bir uygulama kilididir**; bankacılık düzeyinde veri şifrelemesi değildir. Android Room/SQLite veritabanı ve dışa aktarılan ZIP yedekleri **şifreli değildir**; telefonu başka uygulamalar, root erişimi veya erişilebilir ZIP kopyaları üzerinden korumaz. Kullanıcı adı ve şifre sunucuya gitmez; yalnızca tuzlanmış özetleri cihazda tutulur. **Kurtarma kodlarının hepsi kaybolursa ve şifre unutulursa sunucusuz olarak hesap kurtarılamaz.** Uygulamayı silince yerel hesap ve veriler silinebilir. Manuel ZIP finans yedekleri hesap/şifre bilgilerini içermez. Güncelleme denetimi, hesap girişinden ayrı bir GitHub bağlantısı kullanabilir.
+
+**Sürüm uyumluluğu:** v0.4.0 finans veritabanı korunur; yeni oturum kilidi ilk açılışta mevcut yerel verilerin önüne eklenir. APK imzası sabitlenmediğinden debug sürüm güncellemesi başarısız olabilir; önce dışarıdaki ZIP yedeğini kontrol et.
