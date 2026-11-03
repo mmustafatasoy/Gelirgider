@@ -11,7 +11,8 @@ Kotlin, Jetpack Compose ve Room kullanılarak ilk **gerçek Android uygulama kay
 **Önceki v0.3.0 başarılı test APK:**
 https://github.com/mmustafatasoy/Gelirgider/actions/runs/41676669873
 
-**v0.4.0 test APK:** GitHub Actions derlemesi başarılı olursa son koşuda Artifacts altında bulunacaktır.
+**v0.4.0 başarılı test APK:**
+https://github.com/mmustafatasoy/Gelirgider/actions/runs/41678303239
 
 Derleme sayfasını açıp **Artifacts → EYMEN-GELIR-debug-apk** üzerinden ZIP'i indir; ZIP içindeki `app-debug.apk` dosyasını telefona yükle. GitHub artefakt indirmesi için giriş gerekebilir.
 
@@ -54,6 +55,7 @@ Bu bir **debug/test APK** dosyasıdır, Google Play'e sunulmuş bir sürüm değ
 - Dağıtım: Android test APK'sı (GitHub Actions). Henüz resmî Release yayımlanmadı.
 
 ## 🎨 Varlıklar ve belgeler
+- [CHANGELOG.md](CHANGELOG.md): tüm sürümlerin değişiklik geçmişi
 - `assets/icons/svg/`: 38 bağımsız SVG simgesi
 - `previews/update-notification.html`: tasarım amaçlı güncelleme bildirim kutusu
 - `docs/DESIGN_GUIDE.md`: tema ve arayüz
