@@ -6,7 +6,8 @@
 - 8 tek kullanımlık kurtarma kodu, otomatik rastgele geçici şifre ve zorunlu parola sıfırlama.
 - Oturum kilitleme ve mevcut şifreyle kurtarma kodlarını yeniden üretme.
 - Finans veritabanının şifresiz olduğu açıkça belgelenmiştir.
-- Test APK: GitHub Actions sonucuna göre ayrıca doğrulanacak.
+- Birim testleri ve Android debug APK derlemesi: başarılı.
+- Test APK: https://github.com/mmustafatasoy/Gelirgider/actions/runs/41680420362
 
 ## v0.4.0 (3 Kasım 2026)
 - Aylık tekrar eden kategori bütçeleri ve limit kullanım oranları.
