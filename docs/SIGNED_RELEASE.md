@@ -20,11 +20,11 @@ Android güncellemelerinde APK'ların **aynı kalıcı imzalama anahtarı** ile 
 Örneğin bilgisayarda base64: `base64 -w 0 eymen-release.jks` (Linux). Windows PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("eymen-release.jks"))`.
 
 ## 3. İmzalı kararlı yayın
-1. GitHub → **Actions** → **EYMEN GELİR — Signed Stable Release**.
-2. **Run workflow** → branch `main` → onay `PUBLISH`.
+1. GitHub → **Actions** → **EYMEN GELİR · Resmî İmzalı Release**.
+2. İş akışı, uygulama değişiklikleri `main` dalına gönderilince otomatik çalışır. Gerekirse **Run workflow** ile manuel başlatılabilir.
 3. İş akışı test, APK oluşturma, Android imza doğrulama ve SHA-256 bütünlük hesaplaması yapar.
-4. Hepsi başarılıysa `v0.6.0` etiketiyle **pre-release olmayan, latest işaretli kararlı** GitHub Release yayımlanır.
-5. Yayım sonrasında: `https://github.com/mmustafatasoy/Gelirgider/releases/tag/v0.6.0`.
+4. Hepsi başarılıysa mevcut `versionName` (örneğin `v0.6.1`) etiketiyle **pre-release olmayan, latest işaretli kararlı** GitHub Release yayımlanır.
+5. Yayım sonrasında: `https://github.com/mmustafatasoy/Gelirgider/releases`. Artifacts içinden debug APK indirilmez.
 
 **Durum:** GitHub Secrets verilmediği sürece yayımlama işlemi başarısız olur; **kararlı sürüm hazır veya yayımlandı diye sunulmaz**.
 

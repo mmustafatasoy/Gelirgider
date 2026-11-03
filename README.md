@@ -8,25 +8,12 @@
 
 Kotlin, Jetpack Compose ve Room kullanılarak ilk **gerçek Android uygulama kaynakları** yazıldı. GitHub Actions ile testler ve APK derlemesi başarıyla tamamlandı.
 
-**Önceki v0.3.0 başarılı test APK:**
-https://github.com/mmustafatasoy/Gelirgider/actions/runs/41676669873
+**Resmî imzalı APK ve tüm kararlı sürümler:**
+https://github.com/mmustafatasoy/Gelirgider/releases
 
-**v0.4.0 önceki test APK:**
-https://github.com/mmustafatasoy/Gelirgider/actions/runs/41678303239
+**Yayın ilkesi:** Son kullanıcı için debug APK paylaşılmaz. APK'lar yalnızca kalıcı üretim anahtarıyla imzalandıktan, testleri geçtikten ve GitHub Releases'e gerçekten yüklendikten sonra indirilir. **Şu anda yayımlanmış bir GitHub Release yoktur.** İmzalama sırları tanımlanana kadar bir derleme çıktısı resmî APK olarak sunulmaz.
 
-**v0.5.0 önceki test APK:**
-https://github.com/mmustafatasoy/Gelirgider/actions/runs/41680420362
-
-**v0.6.0 eski TEST APK:**
-https://github.com/mmustafatasoy/Gelirgider/actions/runs/41684805044
-
-**İmzalı kararlı Release (henüz yayımlanmadı):** GitHub Secrets ayarları ve manuel yayın çalışması gerekir. [Adımlar](docs/SIGNED_RELEASE.md).
-
-Derleme sayfasını açıp **Artifacts → EYMEN-GELIR-debug-apk** üzerinden ZIP'i indir; ZIP içindeki `app-debug.apk` dosyasını telefona yükle. GitHub artefakt indirmesi için giriş gerekebilir.
-
-**v0.6.1:** Kurtarma kodunu kopyalarken başına gelen `1.`, `2)` gibi numaralar ve farklı tire/boşluk biçimleri artık kabul ediliyor. Kurtarma kodu ekranındaki sıra numaraları seçilecek kod metninden ayrıldı. Başarılı sıfırlama sonrasında geçici şifre otomatik olarak giriş alanına dolduruluyor. İlk kayıt, bir defalık kod tüketimi, yanlış kullanıcı adı, şifre sıfırlama ve yeni şifreyle giriş Robolectric testleriyle kontrol edildi.
-
-**v0.6.1 doğrulanan imzalı APK:** Bu konuşmada `EYMEN-GELIR-v0.6.1-IMZALI-RELEASE.apk` olarak sunuldu; GitHub Releases'e yüklenmiş değildir. v0.6.0 imzalı sürüm ile aynı imzalama sertifikası kullanıldı. Bu düzeltme hesap verilerini silmez. Test APK'larından geçişte imza farklı olduğundan kurulum için veri yedeği gerekebilir.
+[Ayrıntılı yayın politikası](docs/RELEASE_POLICY.md) · [İmzalama ve güvenli yayın](docs/SIGNED_RELEASE.md)
 
 ### ✅ Uygulamada bulunan özellikler
 - Ana sayfa; seçilen ayın gelir, gider ve kalan bütçe bilgileri
@@ -57,6 +44,7 @@ Derleme sayfasını açıp **Artifacts → EYMEN-GELIR-debug-apk** üzerinden ZI
 - Açık renkli tema ve hareketli uygulama simgesi
 
 ### 🚧 Sıradaki işler
+- GitHub Actions üretim imzalama sırlarının güvenli şekilde tanımlanması, ilk resmî Release yayımlanması
 - ZIP yedeklerini parola ile şifreleme ve yedekleme geçmişi
 - Fiş/fatura fotoğrafı ekleme
 - Sürüm güncellemesi için daha gelişmiş sistem bildirimleri ve imzalı üretim sürümleri
@@ -72,7 +60,7 @@ Bu bir **debug/test APK** dosyasıdır, Google Play'e sunulmuş bir sürüm değ
 - `minSdk 26` / `targetSdk 36` / `compileSdk 36`
 - GitHub Actions iş akışı: `.github/workflows/android.yml`
 - GitHub sürüm denetimi: `https://api.github.com/repos/mmustafatasoy/Gelirgider/releases/latest`
-- Dağıtım: Android test APK'sı (GitHub Actions). Henüz resmî Release yayımlanmadı.
+- Dağıtım: Yalnızca GitHub Releases üzerinden imzalı kararlı APK. Henüz yayımlanmış Release yok.
 
 ## 🎨 Varlıklar ve belgeler
 - [CHANGELOG.md](CHANGELOG.md): tüm sürümlerin değişiklik geçmişi
