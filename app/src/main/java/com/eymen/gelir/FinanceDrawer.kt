@@ -35,6 +35,7 @@ fun FinanceDrawerContent(
             "GENEL" to listOf(
                 Triple("HOME", "🏠", "Ana Sayfa"),
                 Triple("ENTRIES", "🧾", "Gelir & Gider"),
+                Triple("TRANSFERS", "💸", "Gönderilen Paralar"),
                 Triple("CATEGORIES", "▦", "Kategoriler")
             ),
             "ANALİZ VE BÜTÇE" to listOf(

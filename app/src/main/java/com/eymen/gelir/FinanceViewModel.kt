@@ -77,10 +77,18 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         description: String,
         occurredAt: Long,
         receiptUri: Uri? = null,
-        removeReceipt: Boolean = false
+        removeReceipt: Boolean = false,
+        recipientName: String? = null
     ) {
+        if (kind == "EXPENSE" && category == "Gönderilen Para" && recipientName.isNullOrBlank()) {
+            operationStatus.value = "Para gönderilen kişinin adını yaz."
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val safeRecipient = if (kind == "EXPENSE" && category == "Gönderilen Para") {
+                    recipientName?.trim()?.take(100)?.takeIf { it.isNotBlank() }
+                } else null
                 val uuid = existing?.entryUuid ?: UUID.randomUUID().toString()
                 val receiptName = when {
                     receiptUri != null -> ReceiptStorage.saveFromUri(
@@ -98,7 +106,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                             amountKurus = amountKurus,
                             description = description.trim(),
                             occurredAt = occurredAt,
-                            receiptFileName = receiptName
+                            receiptFileName = receiptName,
+                            recipientName = safeRecipient
                         )
                     )
                 } else {
@@ -109,7 +118,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                             amountKurus = amountKurus,
                             description = description.trim(),
                             occurredAt = occurredAt,
-                            receiptFileName = receiptName
+                            receiptFileName = receiptName,
+                            recipientName = safeRecipient
                         )
                     )
                 }

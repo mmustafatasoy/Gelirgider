@@ -28,3 +28,8 @@
 
 - [ ] SQLite ve ZIP arşivinin gerçek uçtan uca şifrelenmesi, anahtar kurtarma tasarımı
 - [ ] Yerel hesap/finans kurtarma davranışının gerçek cihaz testleri
+
+- [x] v0.6.0: Kira, operatör telefon faturaları, gönderilen para kategorileri
+- [x] v0.6.0: Alıcı adı alanı; alıcıya göre liste ve ZIP şema v4; Room migration 3→4
+- [ ] v0.6.0: Kalıcı anahtar GitHub Secrets'e girilince imzalı release doğrulanması
+- [ ] v0.6.0: Resmî GitHub Releases kararlı yayın (imzalama sırları gerekli)

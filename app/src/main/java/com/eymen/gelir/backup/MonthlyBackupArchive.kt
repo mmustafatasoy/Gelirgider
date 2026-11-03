@@ -34,7 +34,7 @@ data class BackupSnapshot(
  */
 object MonthlyBackupArchive {
     private const val MAGIC = "eymen-gelir-month"
-    private const val FORMAT_VERSION = 3
+    private const val FORMAT_VERSION = 4
     private const val MAX_UNCOMPRESSED_BYTES = 20 * 1024 * 1024
     private const val MAX_PHOTOS = 80
     private const val MAX_PLANS = 400
@@ -67,6 +67,7 @@ object MonthlyBackupArchive {
                     .put("occurredAt", entry.occurredAt)
                     .put("createdAt", entry.createdAt)
                     .put("receiptFileName", entry.receiptFileName ?: JSONObject.NULL)
+                    .put("recipientName", entry.recipientName ?: JSONObject.NULL)
             )
         }
         val cats = JSONArray()
@@ -209,6 +210,12 @@ object MonthlyBackupArchive {
             val receiptName = if (archiveVersion >= 2 && !raw.isNull("receiptFileName")) {
                 raw.getString("receiptFileName")
             } else null
+            val recipientName = if (archiveVersion >= 4 && !raw.isNull("recipientName")) {
+                raw.getString("recipientName").trim()
+            } else null
+            require(recipientName == null || (recipientName.isNotBlank() && recipientName.length <= 100)) {
+                "Para gönderilen kişi adı geçersiz."
+            }
             require(receiptName == null || receiptName == uuid + ".jpg") { "Fiş adı uyuşmuyor." }
 
             require(uuid.matches(Regex("[0-9a-fA-F-]{36}")) && uuids.add(uuid))
@@ -225,7 +232,8 @@ object MonthlyBackupArchive {
                 description = description,
                 occurredAt = occurredAt,
                 createdAt = createdAt,
-                receiptFileName = receiptName
+                receiptFileName = receiptName,
+                recipientName = recipientName
             )
             require(matchesMonth(entry, month, zone)) { "Yedekte farklı bir ayın kaydı bulundu." }
             entries.add(entry)

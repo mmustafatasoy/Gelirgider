@@ -1,5 +1,13 @@
 # EYMEN GELİR — Sürüm Geçmişi
 
+## v0.6.0 (3 Kasım 2026)
+- Kira, Turkcell, Vodafone, Türk Telekom, diğer telefon ve Gönderilen Para kategorileri.
+- Gönderilen Para için alıcı adı; kişi bazında özet, arama ve geçmiş ekranı.
+- Room v4 migration: alıcı adı için yeni alan, önceki finans kayıtları korunur.
+- ZIP format v4: alıcı adı dahil; eski ZIP biçimleri okunur.
+- İmzalı ve kararlı GitHub Releases yayımlama iş akışı hazırlanır; kalıcı imzalama anahtarı GitHub Secrets'te olmadan yayın durdurulur.
+- Kararlı sürüm: Henüz yayımlanmadı (imzalama sırları gerekiyor).
+
 ## v0.5.0 (3 Kasım 2026)
 - Animasyonlu donut grafik ve detaylı yan menü.
 - Tek cihazlık sunucusuz yerel hesap: kullanıcı adı, güçlü parola türetme, doğrulama.

@@ -277,6 +277,14 @@ private fun EymenApp(
                         entries, categories, selectedMonth, { selectedMonth = it },
                         onEdit = { editing = it }, onDelete = { deleting = it }
                     )
+                    "TRANSFERS" -> TransfersScreen(
+                        entries = entries,
+                        onNewTransfer = {
+                            editing = null
+                            newEntryKind = "EXPENSE"
+                        },
+                        onEdit = { editing = it }
+                    )
                     "CATEGORIES" -> CategoriesScreen(categories, vm)
                     "REPORTS" -> ReportsScreen(entries, selectedMonth, { selectedMonth = it }, vm, categories)
                     "BUDGET" -> Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -300,9 +308,10 @@ private fun EymenApp(
                 kind = editing?.kind ?: newEntryKind ?: "EXPENSE",
                 initial = editing,
                 categories = categories,
+                preselectedCategory = if (tab == "TRANSFERS" && editing == null) "Gönderilen Para" else null,
                 onDismiss = { editing = null; newEntryKind = null },
-                onSave = { kind, cat, money, desc, time, receiptUri, removeReceipt ->
-                    vm.addOrUpdate(editing, kind, cat, money, desc, time, receiptUri, removeReceipt)
+                onSave = { kind, cat, money, desc, time, receiptUri, removeReceipt, person ->
+                    vm.addOrUpdate(editing, kind, cat, money, desc, time, receiptUri, removeReceipt, person)
                     editing = null
                     newEntryKind = null
                 }
@@ -481,6 +490,10 @@ private fun EntryRow(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(entry.category, fontWeight = FontWeight.SemiBold)
+                if (entry.category == "Gönderilen Para") {
+                    Text("👤 Alıcı: " + entry.recipientName.orEmpty().ifBlank { "Belirtilmedi" },
+                        fontSize = 12.sp, color = blue)
+                }
                 Text(
                     entry.description.ifBlank { "Açıklama eklenmedi" },
                     maxLines = 1, overflow = TextOverflow.Ellipsis, color = gray, fontSize = 12.sp
@@ -895,8 +908,9 @@ private fun EntryDialog(
     kind: String,
     initial: FinanceEntry?,
     categories: List<FinanceCategory>,
+    preselectedCategory: String? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String, Long, String, Long, Uri?, Boolean) -> Unit
+    onSave: (String, String, Long, String, Long, Uri?, Boolean, String?) -> Unit
 ) {
     val context = LocalContext.current
     var actualKind by remember(initial?.id) { mutableStateOf(kind) }
@@ -905,7 +919,12 @@ private fun EntryDialog(
     }
     var description by remember(initial?.id) { mutableStateOf(initial?.description ?: "") }
     var occurredAt by remember(initial?.id) { mutableStateOf(initial?.occurredAt ?: System.currentTimeMillis()) }
-    var category by remember(initial?.id) { mutableStateOf(initial?.category ?: "") }
+    var category by remember(initial?.id, preselectedCategory) {
+        mutableStateOf(initial?.category ?: preselectedCategory.orEmpty())
+    }
+    var recipient by remember(initial?.id) {
+        mutableStateOf(initial?.recipientName.orEmpty())
+    }
     var expanded by remember { mutableStateOf(false) }
     var selectedPhoto by remember(initial?.id) { mutableStateOf<Uri?>(null) }
     var removeExistingPhoto by remember(initial?.id) { mutableStateOf(false) }
@@ -964,6 +983,16 @@ private fun EntryDialog(
                             )
                         }
                     }
+                }
+                if (actualKind == "EXPENSE" && currentCategory == "Gönderilen Para") {
+                    OutlinedTextField(
+                        value = recipient,
+                        onValueChange = { recipient = it.take(100) },
+                        label = { Text("Parayı kime gönderdin? *") },
+                        placeholder = { Text("Ad Soyad / Alıcı") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    )
                 }
                 OutlinedTextField(
                     amount, { amount = it.take(24) },
@@ -1026,8 +1055,10 @@ private fun EntryDialog(
         },
         confirmButton = {
             Button(
-                enabled = parsed != null && currentCategory.isNotBlank(),
-                onClick = { if (parsed != null) onSave(actualKind, currentCategory, parsed, description, occurredAt, selectedPhoto, removeExistingPhoto) }
+                enabled = parsed != null && currentCategory.isNotBlank() &&
+                    (actualKind != "EXPENSE" || currentCategory != "Gönderilen Para" || recipient.isNotBlank()),
+                onClick = { if (parsed != null) onSave(actualKind, currentCategory, parsed, description, occurredAt, selectedPhoto, removeExistingPhoto,
+                        if (currentCategory == "Gönderilen Para") recipient.trim() else null) }
             ) { Text("Kaydet") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("İptal") } }

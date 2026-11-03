@@ -1,0 +1,122 @@
+name: EYMEN GELİR — Signed Stable Release
+
+# Deliberately manual. No stable APK is published without a persistent private key.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Stable v0.6.0 sürümünü gerçekten yayımlamak için PUBLISH yazın'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: eymen-gelir-production-release
+  cancel-in-progress: false
+
+jobs:
+  sign-and-publish:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm == 'PUBLISH' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      TAG: v0.6.0
+      EYMEN_RELEASE_KEY_ALIAS: ${{ secrets.EYMEN_KEY_ALIAS }}
+      EYMEN_RELEASE_STORE_PASSWORD: ${{ secrets.EYMEN_KEYSTORE_PASSWORD }}
+      EYMEN_RELEASE_KEY_PASSWORD: ${{ secrets.EYMEN_KEY_PASSWORD }}
+      EYMEN_KEYSTORE_BASE64: ${{ secrets.EYMEN_KEYSTORE_BASE64 }}
+      EYMEN_RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/eymen-release.jks
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Read main branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure release tag does not already exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Refusing to overwrite."
+            exit 1
+          fi
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+            echo "Tag $TAG already exists. Refusing to reuse."
+            exit 1
+          fi
+          grep -q 'versionName = "0.6.0"' app/build.gradle.kts
+          grep -q 'versionCode = 6' app/build.gradle.kts
+
+      - name: Verify signing secrets configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$EYMEN_KEYSTORE_BASE64" ||
+                -z "$EYMEN_RELEASE_STORE_PASSWORD" ||
+                -z "$EYMEN_RELEASE_KEY_PASSWORD" ||
+                -z "$EYMEN_RELEASE_KEY_ALIAS" ]]; then
+            echo "Missing signing secrets. See docs/SIGNED_RELEASE.md"
+            exit 1
+          fi
+          printf '%s' "$EYMEN_KEYSTORE_BASE64" | base64 --decode > "$EYMEN_RELEASE_KEYSTORE_PATH"
+          chmod 600 "$EYMEN_RELEASE_KEYSTORE_PATH"
+          test -s "$EYMEN_RELEASE_KEYSTORE_PATH"
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -n "$sdk"
+          yes | "$sdk" --licenses >/dev/null || true
+          "$sdk" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Test and build signed RELEASE APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :app:testDebugUnitTest :app:assembleRelease
+          test -s app/build/outputs/apk/release/app-release.apk
+
+      - name: Verify signature and SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$PWD/app/build/outputs/apk/release/app-release.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -v 4 "$apk"
+          sha256sum "$apk" | tee "EYMEN-GELIR-v0.6.0.sha256"
+
+      - name: Upload signed release as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EYMEN-GELIR-v0.6.0-SIGNED
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            EYMEN-GELIR-v0.6.0.sha256
+          if-no-files-found: error
+
+      - name: Publish stable GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$TAG"             "app/build/outputs/apk/release/app-release.apk#EYMEN-GELIR-v0.6.0.apk"             "EYMEN-GELIR-v0.6.0.sha256"             --target "$GITHUB_SHA"             --title "EYMEN GELİR v0.6.0 — Kararlı"             --notes "Kira, Turkcell, Vodafone, Türk Telekom ve gönderilen paralar; alıcıya göre transfer geçmişi, yerel hesap ve ZIP yedekleme. Bu sürüm kalıcı bir anahtarla imzalanmıştır. Önceki debug APK'lar farklı imzaya sahip olabilir."             --latest
+
+      - name: Remove temporary keystore
+        if: always()
+        shell: bash
+        run: rm -f "$EYMEN_RELEASE_KEYSTORE_PATH"

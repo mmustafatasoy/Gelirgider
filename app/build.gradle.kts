@@ -12,14 +12,38 @@ android {
         applicationId = "com.eymen.gelir"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = 6
+        versionName = "0.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Production credentials are supplied only as temporary CI environment variables.
+    // No private key or password is committed to the public repository.
+    val storePath = System.getenv("EYMEN_RELEASE_KEYSTORE_PATH")
+    val storePass = System.getenv("EYMEN_RELEASE_STORE_PASSWORD")
+    val alias = System.getenv("EYMEN_RELEASE_KEY_ALIAS")
+    val keyPass = System.getenv("EYMEN_RELEASE_KEY_PASSWORD")
+    val hasSigning = listOf(storePath, storePass, alias, keyPass).all { !it.isNullOrBlank() }
+
+    signingConfigs {
+        if (hasSigning) {
+            create("production") {
+                storeFile = file(checkNotNull(storePath))
+                storePassword = checkNotNull(storePass)
+                keyAlias = checkNotNull(alias)
+                keyPassword = checkNotNull(keyPass)
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = false
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasSigning) signingConfig = signingConfigs.getByName("production")
         }
     }
 

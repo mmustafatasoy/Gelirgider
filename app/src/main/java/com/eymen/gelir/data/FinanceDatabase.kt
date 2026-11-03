@@ -27,7 +27,8 @@ data class FinanceEntry(
     val description: String,
     val occurredAt: Long,
     val createdAt: Long = System.currentTimeMillis(),
-    val receiptFileName: String? = null
+    val receiptFileName: String? = null,
+    val recipientName: String? = null
 )
 
 @Entity(tableName = "categories", indices = [Index(value = ["name", "kind"], unique = true)])
@@ -130,7 +131,7 @@ interface FinanceDao {
 
 @Database(
     entities = [FinanceEntry::class, FinanceCategory::class, BudgetLimit::class, PaymentReminder::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -167,13 +168,19 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE entries ADD COLUMN recipientName TEXT")
+            }
+        }
+
         fun get(context: Context): FinanceDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     "eymen_gelir.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
             }
     }
 }
@@ -187,6 +194,12 @@ val DEFAULT_CATEGORIES = listOf(
     FinanceCategory(name = "Doğalgaz", kind = "EXPENSE", emoji = "🔥", isDefault = true),
     FinanceCategory(name = "Bina Aidatı", kind = "EXPENSE", emoji = "🏢", isDefault = true),
     FinanceCategory(name = "Market", kind = "EXPENSE", emoji = "🛒", isDefault = true),
+    FinanceCategory(name = "Kira", kind = "EXPENSE", emoji = "🏠", isDefault = true),
+    FinanceCategory(name = "Telefon - Turkcell", kind = "EXPENSE", emoji = "📱", isDefault = true),
+    FinanceCategory(name = "Telefon - Vodafone", kind = "EXPENSE", emoji = "📲", isDefault = true),
+    FinanceCategory(name = "Telefon - Türk Telekom", kind = "EXPENSE", emoji = "☎️", isDefault = true),
+    FinanceCategory(name = "Telefon - Diğer", kind = "EXPENSE", emoji = "📞", isDefault = true),
+    FinanceCategory(name = "Gönderilen Para", kind = "EXPENSE", emoji = "💸", isDefault = true),
     FinanceCategory(name = "İnternet", kind = "EXPENSE", emoji = "📶", isDefault = true),
     FinanceCategory(name = "Ulaşım", kind = "EXPENSE", emoji = "🚘", isDefault = true),
     FinanceCategory(name = "Sağlık", kind = "EXPENSE", emoji = "❤️", isDefault = true),

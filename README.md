@@ -4,7 +4,7 @@
 
 **Geliştirici:** Muhammet Atasoy · **Yayıncı:** Atasoy Yazılım · **Lisans:** [MIT](LICENSE)
 
-## ✅ Android uygulaması v0.5.0 — Yerel Hesap, Kurtarma Kodları ve Yuvarlak Grafik
+## ✅ Android uygulaması v0.6.0 — Kira, Telefon, Gönderilen Paralar ve İmzalı Release Hazırlığı
 
 Kotlin, Jetpack Compose ve Room kullanılarak ilk **gerçek Android uygulama kaynakları** yazıldı. GitHub Actions ile testler ve APK derlemesi başarıyla tamamlandı.
 
@@ -14,8 +14,10 @@ https://github.com/mmustafatasoy/Gelirgider/actions/runs/41676669873
 **v0.4.0 önceki test APK:**
 https://github.com/mmustafatasoy/Gelirgider/actions/runs/41678303239
 
-**v0.5.0 başarılı test APK:**
+**v0.5.0 önceki test APK:**
 https://github.com/mmustafatasoy/Gelirgider/actions/runs/41680420362
+
+**v0.6.0 test APK:** Bu sürümün GitHub Actions derlemesi tamamlandıktan sonra bağlantısı güncellenecek.
 
 Derleme sayfasını açıp **Artifacts → EYMEN-GELIR-debug-apk** üzerinden ZIP'i indir; ZIP içindeki `app-debug.apk` dosyasını telefona yükle. GitHub artefakt indirmesi için giriş gerekebilir.
 
@@ -27,6 +29,9 @@ Derleme sayfasını açıp **Artifacts → EYMEN-GELIR-debug-apk** üzerinden ZI
 - İlk kayıt sırasında **8 tek kullanımlık kurtarma kodu**, kodla geçici şifre, ardından zorunlu yeni şifre
 - Hesap ekranından mevcut şifreyi girerek kurtarma kodlarını yeniden oluşturma ve oturumu kilitleme
 - Yeni gelir / gider girişi: kategori, Türk lirası tutar, açıklama, tarih
+- Yeni gider kategorileri: **Kira**, **Telefon - Turkcell**, **Telefon - Vodafone**, **Telefon - Türk Telekom**, Telefon - Diğer, **Gönderilen Para** (Market zaten mevcut)
+- Gönderilen Para için **alıcı adı zorunlu**, alıcıya göre toplamlar ve aramalı transfer geçmişi
+- Para gönderimleri aylık/yıllık gider hesaplarına eklenir; alıcı ve açıklama ZIP yedeklerinde saklanır
 - İşlem listesini ay bazında ve gelir/gider filtresiyle görüntüleme
 - İşlemleri düzenleme, onayla silme
 - Elektrik, su, doğalgaz, bina aidatı, market, internet, ulaşım ve diğer kategoriler
@@ -106,3 +111,14 @@ Ayarlar → Yedekleme Merkezi → ayı seç → ZIP olarak dışa aktar. ZIP se�
 **Önemli güvenlik sınırları:** Bu sistem **sunucusuz ve tek cihazlı bir uygulama kilididir**; bankacılık düzeyinde veri şifrelemesi değildir. Android Room/SQLite veritabanı ve dışa aktarılan ZIP yedekleri **şifreli değildir**; telefonu başka uygulamalar, root erişimi veya erişilebilir ZIP kopyaları üzerinden korumaz. Kullanıcı adı ve şifre sunucuya gitmez; yalnızca tuzlanmış özetleri cihazda tutulur. **Kurtarma kodlarının hepsi kaybolursa ve şifre unutulursa sunucusuz olarak hesap kurtarılamaz.** Uygulamayı silince yerel hesap ve veriler silinebilir. Manuel ZIP finans yedekleri hesap/şifre bilgilerini içermez. Güncelleme denetimi, hesap girişinden ayrı bir GitHub bağlantısı kullanabilir.
 
 **Sürüm uyumluluğu:** v0.4.0 finans veritabanı korunur; yeni oturum kilidi ilk açılışta mevcut yerel verilerin önüne eklenir. APK imzası sabitlenmediğinden debug sürüm güncellemesi başarısız olabilir; önce dışarıdaki ZIP yedeğini kontrol et.
+
+
+## 💸 v0.6.0 — Kira, telefon ve para gönderme
+Gider Ekle ekranından Kira, Telefon - Turkcell, Telefon - Vodafone, Telefon - Türk Telekom ve Market kategorilerini seçerek kayıt oluşturabilirsiniz. **Gönderilen Para** kategorisinde kime gönderdiğinizi yazmak zorunludur. Sol menüde **Gönderilen Paralar** bölümünden kişiye göre toplamları, açıklamayı, tarihi ve tekil gönderimleri görebilirsiniz.
+
+## 🔏 Kararlı GitHub Releases ve dijital imza
+Bu açık depoda **kalıcı bir Android imzalama anahtarı tutulmaz**. Üretim imzalama, GitHub Actions repository secrets ayarlarında oluşturulan ve aynı kimlikle gelecekte de saklanacak dört gizli değer ile yapılır: `EYMEN_KEYSTORE_BASE64`, `EYMEN_KEYSTORE_PASSWORD`, `EYMEN_KEY_ALIAS`, `EYMEN_KEY_PASSWORD`. **Bunlar kurulmadan v0.6.0 kararlı sürüm yayımlanamaz**; derleme yalnızca debug APK çıkarır.
+
+`.github/workflows/release.yml`, yönetici **PUBLISH** onayıyla testler çalıştırır, Google Android imzalama yapılandırması ile release APK üretir, imzayı doğrular, SHA256 oluşturur ve `v0.6.0` tag'iyle GitHub Releases'e kararlı (prerelease olmayan) sürüm yayımlar.
+
+**İmzalama anahtarını GitHub'a açık dosya olarak koymayın.** Anahtarın güvenli bir yedeğini alın; kaybederseniz kullanıcıların mevcut kurulumlarını aynı uygulama olarak güncelleyemezsiniz. Önceki geçici debug APK'lar, yeni release anahtarının imzasıyla uyumlu olmayacağından **üzerine kurulamaz**. Kullanıcı verilerinin ZIP yedeğini silmeden önce kontrol edin. GitHub Releases URL'si, yalnızca yayın işlemi gerçekten tamamlandıktan sonra paylaşılır.
