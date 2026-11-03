@@ -19,28 +19,37 @@ import java.util.zip.ZipOutputStream
 data class BackupSnapshot(
     val month: YearMonth,
     val entries: List<FinanceEntry>,
-    val categories: List<FinanceCategory>
+    val categories: List<FinanceCategory>,
+    val receipts: Map<String, ByteArray> = emptyMap()
 )
 
 /**
- * EYMEN GELİR monthly archive version 1.
+ * EYMEN GELİR monthly archive versions 1 and 2 (backward compatible).
  * Format: manifest.json (SHA-256 + month + time zone), records.json (entries + categories).
- * Only two whitelisted entries are accepted; extraction is size-bound and never writes files.
+ * Whitelisted entries include optional receipt JPEGs in v2; extraction never writes files.
  */
 object MonthlyBackupArchive {
     private const val MAGIC = "eymen-gelir-month"
-    private const val FORMAT_VERSION = 1
-    private const val MAX_UNCOMPRESSED_BYTES = 12 * 1024 * 1024
+    private const val FORMAT_VERSION = 2
+    private const val MAX_UNCOMPRESSED_BYTES = 20 * 1024 * 1024
+    private const val MAX_PHOTOS = 80
     private const val MAX_ENTRIES = 20000
     private const val MAX_CATEGORIES = 400
     private const val MANIFEST = "manifest.json"
     private const val RECORDS = "records.json"
+    private val receiptPattern = Regex("receipts/[0-9a-fA-F-]{36}\\.jpg")
 
     fun write(output: OutputStream, snapshot: BackupSnapshot, timeZone: ZoneId = ZoneId.systemDefault()) {
         require(snapshot.entries.size <= MAX_ENTRIES && snapshot.categories.size <= MAX_CATEGORIES) {
             "Yedek sınırı aşıldı."
         }
         require(snapshot.entries.all { matchesMonth(it, snapshot.month, timeZone) })
+        require(snapshot.receipts.size <= MAX_PHOTOS)
+        val photoIds = snapshot.entries.filter { it.receiptFileName != null }.map { it.entryUuid }.toSet()
+        require(snapshot.receipts.keys == photoIds) { "Bazı fiş fotoğrafları yedekte yok." }
+        require(snapshot.receipts.values.all { it.size in 4..ReceiptStorage.MAX_BYTES && ReceiptStorage.isJpeg(it) }) {
+            "Geçersiz fiş JPEG içeriği."
+        }
         val items = JSONArray()
         snapshot.entries.forEach { entry ->
             items.put(
@@ -52,6 +61,7 @@ object MonthlyBackupArchive {
                     .put("description", entry.description)
                     .put("occurredAt", entry.occurredAt)
                     .put("createdAt", entry.createdAt)
+                    .put("receiptFileName", entry.receiptFileName ?: JSONObject.NULL)
             )
         }
         val cats = JSONArray()
@@ -67,6 +77,11 @@ object MonthlyBackupArchive {
         val payload = JSONObject().put("entries", items).put("categories", cats)
             .toString().toByteArray(StandardCharsets.UTF_8)
         require(payload.size <= MAX_UNCOMPRESSED_BYTES) { "Yedek çok büyük." }
+        val receiptHashes = JSONObject()
+        snapshot.receipts.toSortedMap().forEach { (uuid, bytes) ->
+            require(snapshot.entries.any { it.entryUuid == uuid && it.receiptFileName == uuid + ".jpg" })
+            receiptHashes.put(uuid, sha256(bytes))
+        }
         val manifest = JSONObject()
             .put("magic", MAGIC)
             .put("formatVersion", FORMAT_VERSION)
@@ -74,29 +89,41 @@ object MonthlyBackupArchive {
             .put("timeZone", timeZone.id)
             .put("entryCount", snapshot.entries.size)
             .put("recordSha256", sha256(payload))
+            .put("receiptSha256", receiptHashes)
             .toString().toByteArray(StandardCharsets.UTF_8)
         ZipOutputStream(output).use { zip ->
             writeFile(zip, MANIFEST, manifest)
             writeFile(zip, RECORDS, payload)
+            snapshot.receipts.toSortedMap().forEach { (uuid, bytes) ->
+                writeFile(zip, "receipts/" + uuid + ".jpg", bytes)
+            }
         }
     }
 
     fun read(input: InputStream): BackupSnapshot {
         val files = LinkedHashMap<String, ByteArray>()
         var totalBytes = 0
+        var photoCount = 0
         ZipInputStream(input).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
-                require(!entry.isDirectory && entry.name in setOf(MANIFEST, RECORDS)) {
+                require(!entry.isDirectory && (entry.name in setOf(MANIFEST, RECORDS) || receiptPattern.matches(entry.name))) {
                     "Tanımlanmayan ZIP içeriği."
                 }
                 require(!files.containsKey(entry.name)) { "Tekrarlı ZIP girişi." }
+                if (entry.name.startsWith("receipts/")) {
+                    photoCount++
+                    require(photoCount <= MAX_PHOTOS) { "Çok fazla fiş fotoğrafı." }
+                }
                 val buffer = ByteArray(8192)
                 val dest = ByteArrayOutputStream()
                 while (true) {
                     val read = zip.read(buffer)
                     if (read == -1) break
                     totalBytes += read
+                    if (entry.name.startsWith("receipts/")) {
+                        require(dest.size() + read <= ReceiptStorage.MAX_BYTES) { "Fiş boyutu sınırı aşıldı." }
+                    }
                     require(totalBytes <= MAX_UNCOMPRESSED_BYTES) { "ZIP dosyası çok büyük." }
                     dest.write(buffer, 0, read)
                 }
@@ -104,11 +131,12 @@ object MonthlyBackupArchive {
                 zip.closeEntry()
             }
         }
-        require(files.size == 2 && files.containsKey(MANIFEST) && files.containsKey(RECORDS)) {
+        require(files.containsKey(MANIFEST) && files.containsKey(RECORDS)) {
             "Yedek dosyası eksik."
         }
         val manifest = JSONObject(String(files.getValue(MANIFEST), StandardCharsets.UTF_8))
-        require(manifest.getString("magic") == MAGIC && manifest.getInt("formatVersion") == FORMAT_VERSION) {
+        val archiveVersion = manifest.getInt("formatVersion")
+        require(manifest.getString("magic") == MAGIC && archiveVersion in 1..FORMAT_VERSION) {
             "Desteklenmeyen yedek biçimi."
         }
         val month = YearMonth.parse(manifest.getString("month"))
@@ -150,6 +178,11 @@ object MonthlyBackupArchive {
             val amountKurus = raw.getLong("amountKurus")
             val occurredAt = raw.getLong("occurredAt")
             val createdAt = raw.getLong("createdAt")
+            val receiptName = if (archiveVersion >= 2 && !raw.isNull("receiptFileName")) {
+                raw.getString("receiptFileName")
+            } else null
+            require(receiptName == null || receiptName == uuid + ".jpg") { "Fiş adı uyuşmuyor." }
+
             require(uuid.matches(Regex("[0-9a-fA-F-]{36}")) && uuids.add(uuid))
             require(kind == "INCOME" || kind == "EXPENSE")
             require(category.isNotEmpty() && category.length <= 48)
@@ -163,7 +196,8 @@ object MonthlyBackupArchive {
                 amountKurus = amountKurus,
                 description = description,
                 occurredAt = occurredAt,
-                createdAt = createdAt
+                createdAt = createdAt,
+                receiptFileName = receiptName
             )
             require(matchesMonth(entry, month, zone)) { "Yedekte farklı bir ayın kaydı bulundu." }
             entries.add(entry)
@@ -172,7 +206,23 @@ object MonthlyBackupArchive {
         require(entries.all { entry ->
             categories.any { it.kind == entry.kind && it.name == entry.category }
         }) { "Yedekte bazı kategoriler eksik." }
-        return BackupSnapshot(month, entries, categories)
+        val expectedReceipts = entries.filter { it.receiptFileName != null }.map { it.entryUuid }.toSet()
+        val filesWithImages = files.keys.filter { it.startsWith("receipts/") }.map {
+            it.removePrefix("receipts/").removeSuffix(".jpg")
+        }.toSet()
+        require(expectedReceipts == filesWithImages) { "Fiş fotoğrafları eksik veya fazla." }
+        val hashes = if (archiveVersion >= 2) manifest.getJSONObject("receiptSha256") else JSONObject()
+        require(hashes.length() == expectedReceipts.size) { "Fiş özetleri uyuşmuyor." }
+        val receipts = HashMap<String, ByteArray>()
+        expectedReceipts.forEach { uuid ->
+            val bytes = files.getValue("receipts/" + uuid + ".jpg")
+            require(ReceiptStorage.isJpeg(bytes)) { "Fiş JPEG doğrulaması başarısız." }
+            require(sha256(bytes).equals(hashes.getString(uuid), ignoreCase = true)) {
+                "Fiş bütünlük doğrulaması başarısız."
+            }
+            receipts[uuid] = bytes
+        }
+        return BackupSnapshot(month, entries, categories, receipts)
     }
 
     private fun matchesMonth(entry: FinanceEntry, month: YearMonth, zone: ZoneId): Boolean =

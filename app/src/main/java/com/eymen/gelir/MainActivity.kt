@@ -1,10 +1,18 @@
 package com.eymen.gelir
 
 import android.app.DatePickerDialog
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import java.io.File
+import com.eymen.gelir.backup.MonthlyBackupScheduler
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
@@ -241,8 +249,8 @@ private fun EymenApp(vm: FinanceViewModel = viewModel()) {
                 initial = editing,
                 categories = categories,
                 onDismiss = { editing = null; newEntryKind = null },
-                onSave = { kind, cat, money, desc, time ->
-                    vm.addOrUpdate(editing, kind, cat, money, desc, time)
+                onSave = { kind, cat, money, desc, time, receiptUri, removeReceipt ->
+                    vm.addOrUpdate(editing, kind, cat, money, desc, time, receiptUri, removeReceipt)
                     editing = null
                     newEntryKind = null
                 }
@@ -422,6 +430,9 @@ private fun EntryRow(
                     entry.description.ifBlank { "Açıklama eklenmedi" },
                     maxLines = 1, overflow = TextOverflow.Ellipsis, color = gray, fontSize = 12.sp
                 )
+                if (entry.receiptFileName != null) {
+                    Text("📎 Fiş/fatura ekli", color = blue, fontSize = 11.sp)
+                }
                 Text(Instant.ofEpochMilli(entry.occurredAt).atZone(dateZone).toLocalDate().format(dayFormat),
                     color = gray, fontSize = 11.sp)
             }
@@ -627,6 +638,21 @@ private fun SettingsScreen(
     val context = LocalContext.current
     val pending by vm.pendingImport.collectAsState()
     val busy by vm.backupBusy.collectAsState()
+    var autoFolder by remember { mutableStateOf(MonthlyBackupScheduler.folder(context)) }
+    var autoError by remember { mutableStateOf<String?>(null) }
+    val pickBackupFolder = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { picked ->
+        if (picked != null) {
+            try {
+                MonthlyBackupScheduler.enable(context, picked)
+                autoFolder = picked
+                autoError = null
+            } catch (error: Exception) {
+                autoError = "Klasör izni alınamadı. Başka bir klasör seç."
+            }
+        }
+    }
 
     val saveZip = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip")
@@ -680,6 +706,55 @@ private fun SettingsScreen(
                 )
                 Text("Otomatik aylık yedekleme henüz yok; bu sürümde yedek elle alınır.",
                     color = red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp))
+        HeaderText("🗓 Otomatik Aylık Yedekleme")
+        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Column(Modifier.padding(16.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Her ay otomatik ZIP", fontWeight = FontWeight.Bold)
+                        Text(if (autoFolder != null) "Açık" else "Kapalı", color = gray, fontSize = 12.sp)
+                    }
+                    Switch(
+                        checked = autoFolder != null,
+                        onCheckedChange = { enabled ->
+                            if (enabled) pickBackupFolder.launch(null)
+                            else {
+                                MonthlyBackupScheduler.disable(context)
+                                autoFolder = null
+                            }
+                        }
+                    )
+                }
+                Text(
+                    "Android'in izin verdiği zamanda, önceki tamamlanmış ayın verilerini " +
+                        "seçtiğin klasöre otomatik ZIP olarak kaydeder.",
+                    fontSize = 12.sp, color = gray
+                )
+                if (autoFolder != null) {
+                    Text(
+                        "Son yedek: " + MonthlyBackupScheduler.lastCompletedMonth(context),
+                        color = darkGreen, fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    OutlinedButton(onClick = { pickBackupFolder.launch(null) }) {
+                        Text("Yedek klasörünü değiştir")
+                    }
+                }
+                if (autoError != null) {
+                    Text(autoError.orEmpty(), color = red, fontSize = 12.sp)
+                }
+                Text(
+                    "Otomatik yedekler şifreli değildir. Yalnızca izin verdiğin klasör kullanılır.",
+                    color = gray, fontSize = 11.sp
+                )
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -748,7 +823,7 @@ private fun EntryDialog(
     initial: FinanceEntry?,
     categories: List<FinanceCategory>,
     onDismiss: () -> Unit,
-    onSave: (String, String, Long, String, Long) -> Unit
+    onSave: (String, String, Long, String, Long, Uri?, Boolean) -> Unit
 ) {
     val context = LocalContext.current
     var actualKind by remember(initial?.id) { mutableStateOf(kind) }
@@ -759,6 +834,27 @@ private fun EntryDialog(
     var occurredAt by remember(initial?.id) { mutableStateOf(initial?.occurredAt ?: System.currentTimeMillis()) }
     var category by remember(initial?.id) { mutableStateOf(initial?.category ?: "") }
     var expanded by remember { mutableStateOf(false) }
+    var selectedPhoto by remember(initial?.id) { mutableStateOf<Uri?>(null) }
+    var removeExistingPhoto by remember(initial?.id) { mutableStateOf(false) }
+    val choosePhoto = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { selected ->
+        if (selected != null) {
+            selectedPhoto = selected
+            removeExistingPhoto = false
+        }
+    }
+    val existingPhoto = remember(initial?.receiptFileName) {
+        initial?.receiptFileName?.let { name ->
+            val file = File(File(context.filesDir, "receipts"), name)
+            if (file.isFile) {
+                BitmapFactory.decodeFile(
+                    file.absolutePath,
+                    BitmapFactory.Options().apply { inSampleSize = 4 }
+                )?.asImageBitmap()
+            } else null
+        }
+    }
     val options = categories.filter { it.kind == actualKind }
     val currentCategory = category.takeIf { chosen -> options.any { it.name == chosen } }
         ?: options.firstOrNull()?.name.orEmpty()
@@ -813,6 +909,32 @@ private fun EntryDialog(
                     maxLines = 4,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 )
+                Spacer(Modifier.height(12.dp))
+                Text("Fiş / Fatura Fotoğrafı (isteğe bağlı)", fontWeight = FontWeight.SemiBold)
+                if (existingPhoto != null && selectedPhoto == null && !removeExistingPhoto) {
+                    Image(
+                        bitmap = existingPhoto,
+                        contentDescription = "Kayıtlı fiş fotoğrafı",
+                        modifier = Modifier.fillMaxWidth().height(120.dp).padding(top = 6.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+                if (selectedPhoto != null) {
+                    Text("📷 Yeni fotoğraf seçildi; kaydedilince arşive eklenecek.",
+                        color = blue, fontSize = 12.sp)
+                } else if (initial?.receiptFileName != null && !removeExistingPhoto) {
+                    Text("📎 Fotoğraf kayıtlı", color = green, fontSize = 12.sp)
+                }
+                OutlinedButton(
+                    onClick = { choosePhoto.launch("image/*") },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(if (initial?.receiptFileName != null) "📷 Fotoğrafı Değiştir" else "📷 Fiş/Fatura Ekle") }
+                if (selectedPhoto != null || (initial?.receiptFileName != null && !removeExistingPhoto)) {
+                    TextButton(onClick = {
+                        selectedPhoto = null
+                        removeExistingPhoto = initial?.receiptFileName != null
+                    }) { Text("Fotoğrafı Kaldır", color = red) }
+                }
                 Spacer(Modifier.height(10.dp))
                 OutlinedButton(
                     onClick = {
@@ -832,7 +954,7 @@ private fun EntryDialog(
         confirmButton = {
             Button(
                 enabled = parsed != null && currentCategory.isNotBlank(),
-                onClick = { if (parsed != null) onSave(actualKind, currentCategory, parsed, description, occurredAt) }
+                onClick = { if (parsed != null) onSave(actualKind, currentCategory, parsed, description, occurredAt, selectedPhoto, removeExistingPhoto) }
             ) { Text("Kaydet") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("İptal") } }

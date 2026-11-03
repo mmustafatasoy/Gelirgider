@@ -4,7 +4,7 @@
 
 **Geliştirici:** Muhammet Atasoy · **Yayıncı:** Atasoy Yazılım · **Lisans:** [MIT](LICENSE)
 
-## ✅ Android uygulaması (v0.2.0 — aylık ZIP yedekleme)
+## ✅ Android uygulaması (v0.3.0 — aylık otomatik ZIP ve fiş/fatura fotoğrafları)
 
 Kotlin, Jetpack Compose ve Room kullanılarak ilk **gerçek Android uygulama kaynakları** yazıldı. GitHub Actions ile testler ve APK derlemesi başarıyla tamamlandı.
 
@@ -23,11 +23,14 @@ Derleme sayfasını açıp **Artifacts → EYMEN-GELIR-debug-apk** üzerinden ZI
 - Aylık raporda kategorilerin gider payı; yıllık raporda 12 ayın gelir/gider/kalan özeti
 - Room/SQLite ile telefona kalıcı kayıt; internet gerektirmeyen temel kullanım
 - Ay seçimiyle ZIP dışa aktarma ve doğrulanan ZIP'den kullanıcı onaylı geri yükleme
+- Fiş/fatura fotoğrafı ekleme, değiştirme, kaldırma; görselleri uygulama depolamasında saklama
+- Fotoğrafları aylık ZIP içinde ayrı JPEG dosyaları ve SHA-256 doğrulamasıyla taşıma
+- Kullanıcının klasör izniyle WorkManager üzerinden önceki tamamlanan ayı otomatik ZIP yedekleme
 - Hakkında, sürüm bilgisi ve GitHub Releases sürüm kontrolü
 - Açık renkli tema ve hareketli uygulama simgesi
 
 ### 🚧 Sıradaki işler
-- Otomatik aylık ZIP yedekleme, şifreli yedekleme
+- ZIP yedeklerini parola ile şifreleme ve yedekleme geçmişi
 - Fiş/fatura fotoğrafı ekleme
 - Tekrarlayan ödemeler ve planlı gider bildirimleri
 - Bütçe hedefleri, daha kapsamlı grafikler
@@ -61,5 +64,8 @@ MIT lisanslı açık kaynak proje. © 2026 **Muhammet Atasoy**.
 *Atasoy Yazılım*  
 https://atasoyyazilim.com
 
-## 📦 v0.2.0 Yedekleme Merkezi
+## 📦 v0.3.0 Yedekleme Merkezi
 Ayarlar → Yedekleme Merkezi → ayı seç → ZIP olarak dışa aktar. ZIP seçilip doğrulandıktan sonra mevcut kayıtlar silinmeden, aynı işlem UUID'leri atlanarak geri yüklenir. **ZIP varsayılan olarak şifresizdir ve otomatik oluşturulmaz.** İlk v0.1.0 test APK'sı ZIP özelliğini içermez; geçici debug imzaları farklı olabileceğinden uygulamayı kaldırmadan önce veri güvenliğini sağlayın.
+
+## 🧾 v0.3.0 — Fotoğraflar ve otomatik yedek
+İşlem ekleme/düzenleme formundaki **Fiş/Fatura Ekle** ile telefondan resim seçilir; görsel uygulamanın özel deposuna güvenli boyuta getirilerek kopyalanır. Aylık yedek dosyası artık bunları da içerir. **Eski v0.2.0 ZIP dosyaları okunabilir.** Ayarlar → Otomatik Aylık Yedekleme seçeneğinde erişilebilir bir klasör seçildikten sonra Android WorkManager, ay değiştikten sonra tamamlanan önceki ayı uygun zamanda yedeklemeye çalışır; kesin saat garantisi yoktur. Fotoğraflar ZIP içinde **şifrelenmez**.

@@ -8,8 +8,9 @@
 - [x] ZIP'den onaylı, mükerrerleri atlayan, silmeden geri yükleme
 - [x] ZIP formatı birim testleri
 ## Sonraki aşamalar
-- [ ] Otomatik aylık ZIP; şifreli arşiv
-- [ ] Fiş ve fatura fotoğrafı ekleme
+- [x] Kullanıcı klasör izniyle otomatik aylık ZIP kontrolü (WorkManager)
+- [ ] Şifreli ZIP arşivi
+- [x] Fiş/fatura fotoğrafı ekleme ve aylık ZIP içinde taşıma
 - [ ] Tekrarlayan giderler ve bütçe uyarıları
 - [ ] Kalıcı imzalama anahtarı / güncellenebilir resmî sürüm
 - [ ] Gerçek cihaz ve geri yükleme uçtan uca testleri

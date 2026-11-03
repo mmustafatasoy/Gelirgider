@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.room.withTransaction
 import com.eymen.gelir.backup.BackupSnapshot
 import com.eymen.gelir.backup.MonthlyBackupArchive
+import com.eymen.gelir.backup.ReceiptStorage
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -65,19 +66,30 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         category: String,
         amountKurus: Long,
         description: String,
-        occurredAt: Long
+        occurredAt: Long,
+        receiptUri: Uri? = null,
+        removeReceipt: Boolean = false
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val uuid = existing?.entryUuid ?: UUID.randomUUID().toString()
+                val receiptName = when {
+                    receiptUri != null -> ReceiptStorage.saveFromUri(
+                        getApplication<Application>(), receiptUri, uuid
+                    )
+                    removeReceipt -> null
+                    else -> existing?.receiptFileName
+                }
                 if (existing == null) {
                     dao.insertEntry(
                         FinanceEntry(
-                            entryUuid = UUID.randomUUID().toString(),
+                            entryUuid = uuid,
                             kind = kind,
                             category = category,
                             amountKurus = amountKurus,
                             description = description.trim(),
-                            occurredAt = occurredAt
+                            occurredAt = occurredAt,
+                            receiptFileName = receiptName
                         )
                     )
                 } else {
@@ -87,9 +99,13 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                             category = category,
                             amountKurus = amountKurus,
                             description = description.trim(),
-                            occurredAt = occurredAt
+                            occurredAt = occurredAt,
+                            receiptFileName = receiptName
                         )
                     )
+                }
+                if (removeReceipt && existing?.receiptFileName != null) {
+                    ReceiptStorage.delete(getApplication<Application>(), existing.receiptFileName)
                 }
                 operationStatus.value = "Kayıt kaydedildi."
             } catch (error: Exception) {
@@ -103,6 +119,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 dao.deleteEntry(entry)
+                ReceiptStorage.delete(getApplication<Application>(), entry.receiptFileName)
                 operationStatus.value = "Kayıt silindi."
             } catch (error: Exception) {
                 operationStatus.value = "Kayıt silinemedi."
@@ -145,7 +162,13 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 val monthly = all.filter {
                     YearMonth.from(java.time.Instant.ofEpochMilli(it.occurredAt).atZone(zone)) == month
                 }
-                val snapshot = BackupSnapshot(month, monthly, dao.allCategories())
+                val receipts = monthly.filter { it.receiptFileName != null }.associate { entry ->
+                    entry.entryUuid to ReceiptStorage.read(
+                        getApplication<Application>(),
+                        checkNotNull(entry.receiptFileName)
+                    )
+                }
+                val snapshot = BackupSnapshot(month, monthly, dao.allCategories(), receipts)
                 val resolver = getApplication<Application>().contentResolver
                 val stream = resolver.openOutputStream(uri, "wt")
                     ?: error("Seçilen dosya açılamadı.")
@@ -191,11 +214,26 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 var inserted = 0
-                database.withTransaction {
-                    snapshot.categories.forEach { dao.insertCategory(it.copy(id = 0)) }
-                    snapshot.entries.forEach { entry ->
-                        if (dao.insertEntry(entry.copy(id = 0)) != -1L) inserted++
+                val written = mutableListOf<String>()
+                try {
+                    database.withTransaction {
+                        snapshot.categories.forEach { dao.insertCategory(it.copy(id = 0)) }
+                        snapshot.entries.forEach { entry ->
+                            if (dao.insertEntry(entry.copy(id = 0)) != -1L) {
+                                inserted++
+                                if (entry.receiptFileName != null) {
+                                    val bytes = checkNotNull(snapshot.receipts[entry.entryUuid])
+                                    val name = ReceiptStorage.write(
+                                        getApplication<Application>(), entry.entryUuid, bytes
+                                    )
+                                    written.add(name)
+                                }
+                            }
+                        }
                     }
+                } catch (failed: Exception) {
+                    written.forEach { ReceiptStorage.delete(getApplication<Application>(), it) }
+                    throw failed
                 }
                 operationStatus.value = "${snapshot.month}: ${inserted} yeni işlem geri yüklendi. Mevcut kayıtlar korundu."
             } catch (error: Exception) {

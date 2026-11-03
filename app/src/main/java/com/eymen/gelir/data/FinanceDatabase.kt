@@ -13,6 +13,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "entries", indices = [Index(value = ["entryUuid"], unique = true), Index("occurredAt")])
@@ -24,7 +26,8 @@ data class FinanceEntry(
     val amountKurus: Long,
     val description: String,
     val occurredAt: Long,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val receiptFileName: String? = null
 )
 
 @Entity(tableName = "categories", indices = [Index(value = ["name", "kind"], unique = true)])
@@ -69,12 +72,17 @@ interface FinanceDao {
     suspend fun deleteCategory(category: FinanceCategory)
 }
 
-@Database(entities = [FinanceEntry::class, FinanceCategory::class], version = 1, exportSchema = false)
+@Database(entities = [FinanceEntry::class, FinanceCategory::class], version = 2, exportSchema = false)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
 
     companion object {
         @Volatile private var instance: FinanceDatabase? = null
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE entries ADD COLUMN receiptFileName TEXT")
+            }
+        }
 
         fun get(context: Context): FinanceDatabase =
             instance ?: synchronized(this) {
@@ -82,7 +90,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     "eymen_gelir.db"
-                ).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
             }
     }
 }
