@@ -39,6 +39,29 @@ data class FinanceCategory(
     val isDefault: Boolean = false
 )
 
+@Entity(tableName = "budget_limits")
+data class BudgetLimit(
+    @PrimaryKey val category: String,
+    val monthlyLimitKurus: Long
+)
+
+/**
+ * Recurrent monthly reminder. dayOfMonth is clamped to the last day for shorter months.
+ * Composite uniqueness prevents duplicating the same reminder after ZIP imports.
+ */
+@Entity(
+    tableName = "payment_reminders",
+    indices = [Index(value = ["category", "title", "dayOfMonth"], unique = true)]
+)
+data class PaymentReminder(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val category: String,
+    val title: String,
+    val dayOfMonth: Int,
+    val enabled: Boolean = true,
+    val lastNotifiedMonth: String? = null
+)
+
 @Dao
 interface FinanceDao {
     @Query("SELECT * FROM entries ORDER BY occurredAt DESC, id DESC")
@@ -52,6 +75,39 @@ interface FinanceDao {
 
     @Query("SELECT * FROM categories ORDER BY name COLLATE NOCASE")
     suspend fun allCategories(): List<FinanceCategory>
+
+    @Query("SELECT * FROM budget_limits ORDER BY category COLLATE NOCASE")
+    fun observeBudgetLimits(): Flow<List<BudgetLimit>>
+
+    @Query("SELECT * FROM budget_limits ORDER BY category COLLATE NOCASE")
+    suspend fun allBudgetLimits(): List<BudgetLimit>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveBudgetLimit(budget: BudgetLimit)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun importBudgetLimit(budget: BudgetLimit): Long
+
+    @Query("DELETE FROM budget_limits WHERE category = :category")
+    suspend fun deleteBudgetLimit(category: String)
+
+    @Query("SELECT * FROM payment_reminders ORDER BY dayOfMonth, category COLLATE NOCASE")
+    fun observePaymentReminders(): Flow<List<PaymentReminder>>
+
+    @Query("SELECT * FROM payment_reminders ORDER BY dayOfMonth, category COLLATE NOCASE")
+    suspend fun allPaymentReminders(): List<PaymentReminder>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertPaymentReminder(reminder: PaymentReminder): Long
+
+    @Update
+    suspend fun updatePaymentReminder(reminder: PaymentReminder)
+
+    @Delete
+    suspend fun deletePaymentReminder(reminder: PaymentReminder)
+
+    @Query("UPDATE payment_reminders SET lastNotifiedMonth = :month WHERE id = :id AND (lastNotifiedMonth IS NULL OR lastNotifiedMonth != :month)")
+    suspend fun markReminderNotified(id: Long, month: String): Int
 
     @Query("SELECT COUNT(*) FROM categories")
     suspend fun countCategories(): Int
@@ -72,7 +128,11 @@ interface FinanceDao {
     suspend fun deleteCategory(category: FinanceCategory)
 }
 
-@Database(entities = [FinanceEntry::class, FinanceCategory::class], version = 2, exportSchema = false)
+@Database(
+    entities = [FinanceEntry::class, FinanceCategory::class, BudgetLimit::class, PaymentReminder::class],
+    version = 3,
+    exportSchema = false
+)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
 
@@ -84,13 +144,36 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS budget_limits (" +
+                        "category TEXT NOT NULL PRIMARY KEY, " +
+                        "monthlyLimitKurus INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS payment_reminders (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "category TEXT NOT NULL, " +
+                        "title TEXT NOT NULL, " +
+                        "dayOfMonth INTEGER NOT NULL, " +
+                        "enabled INTEGER NOT NULL, " +
+                        "lastNotifiedMonth TEXT)"
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_payment_reminders_category_title_dayOfMonth " +
+                        "ON payment_reminders (category, title, dayOfMonth)"
+                )
+            }
+        }
+
         fun get(context: Context): FinanceDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     "eymen_gelir.db"
-                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
             }
     }
 }

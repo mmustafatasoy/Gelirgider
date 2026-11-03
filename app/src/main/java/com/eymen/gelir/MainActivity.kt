@@ -12,7 +12,6 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.RepeatMode
@@ -149,6 +148,7 @@ private fun EymenApp(vm: FinanceViewModel = viewModel()) {
     val entries by vm.entries.collectAsState()
     val categories by vm.categories.collectAsState()
     val update by vm.releaseStatus.collectAsState()
+    val budgets by vm.budgetLimits.collectAsState()
     val operation by vm.operationStatus.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     var tab by rememberSaveable { mutableStateOf("HOME") }
@@ -227,7 +227,7 @@ private fun EymenApp(vm: FinanceViewModel = viewModel()) {
                 }
                 when (tab) {
                     "HOME" -> HomeScreen(
-                        entries, categories, selectedMonth, { selectedMonth = it },
+                        entries, categories, budgets, selectedMonth, { selectedMonth = it },
                         onAdd = { editing = null; newEntryKind = it },
                         onEdit = { editing = it }
                     )
@@ -236,7 +236,7 @@ private fun EymenApp(vm: FinanceViewModel = viewModel()) {
                         onEdit = { editing = it }, onDelete = { deleting = it }
                     )
                     "CATEGORIES" -> CategoriesScreen(categories, vm)
-                    "REPORTS" -> ReportsScreen(entries, selectedMonth, { selectedMonth = it })
+                    "REPORTS" -> ReportsScreen(entries, selectedMonth, { selectedMonth = it }, vm, categories)
                     "SETTINGS" -> SettingsScreen(vm, update, selectedMonth, { selectedMonth = it })
                 }
             }
@@ -328,6 +328,7 @@ private fun SummaryCard(label: String, value: Long, emoji: String, tint: Color, 
 private fun HomeScreen(
     entries: List<FinanceEntry>,
     categories: List<FinanceCategory>,
+    budgets: List<com.eymen.gelir.data.BudgetLimit>,
     month: YearMonth,
     onMonthChange: (YearMonth) -> Unit,
     onAdd: (String) -> Unit,
@@ -351,6 +352,7 @@ private fun HomeScreen(
             OutlinedButton(onClick = { onAdd("EXPENSE") }, modifier = Modifier.weight(1f)) { Text("＋ Gider Ekle") }
         }
         Spacer(Modifier.height(20.dp))
+        BudgetAlerts(entries, budgets, month)
         HeaderText("Gider Dağılımı")
         Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
@@ -542,7 +544,9 @@ private fun CategoriesScreen(categories: List<FinanceCategory>, vm: FinanceViewM
 private fun ReportsScreen(
     entries: List<FinanceEntry>,
     month: YearMonth,
-    onMonthChange: (YearMonth) -> Unit
+    onMonthChange: (YearMonth) -> Unit,
+    vm: FinanceViewModel,
+    categories: List<FinanceCategory>
 ) {
     var yearly by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -566,6 +570,11 @@ private fun ReportsScreen(
             }
             val income = total(annual, "INCOME")
             val expense = total(annual, "EXPENSE")
+            val yearlyMaximum = (1..12).map { number ->
+                val itemMonth = YearMonth.of(month.year, number)
+                val chunk = annual.filter { onMonth(it, itemMonth) }
+                maxOf(total(chunk, "INCOME"), total(chunk, "EXPENSE"))
+            }.maxOrNull()?.coerceAtLeast(1L) ?: 1L
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SummaryCard("Yıllık Gelir", income, "💰", paleGreen, Modifier.weight(1f))
                 SummaryCard("Yıllık Gider", expense, "🛒", paleRed, Modifier.weight(1f))
@@ -586,7 +595,7 @@ private fun ReportsScreen(
                             Text("Gelir: ${formatMoney(i)}", color = green, fontSize = 12.sp, modifier = Modifier.weight(1f))
                             Text("Gider: ${formatMoney(e)}", color = red, fontSize = 12.sp, modifier = Modifier.weight(1f))
                         }
-                        val max = maxOf(i, e, 1L).toFloat()
+                        val max = yearlyMaximum.toFloat()
                         RatioBar(i / max, green)
                         RatioBar(e / max, red)
                         Text("Kalan: ${formatMoney(i - e)}", fontSize = 12.sp, color = gray, modifier = Modifier.padding(top = 6.dp))
@@ -604,6 +613,8 @@ private fun ReportsScreen(
                 SummaryCard("Kalan", income - expense, "💼", paleBlue, Modifier.weight(1f))
             }
             Spacer(Modifier.height(18.dp))
+            BudgetPlanner(vm, entries, categories, month)
+            MonthlyWeeklyTrend(entries, month)
             HeaderText("Kategori Bazında Giderler")
             val breakdown = current.filter { it.kind == "EXPENSE" }.groupBy { it.category }
             if (breakdown.isEmpty()) {
@@ -757,6 +768,8 @@ private fun SettingsScreen(
             }
         }
         Spacer(Modifier.height(16.dp))
+        PaymentReminderPanel(vm)
+        Spacer(Modifier.height(18.dp))
         HeaderText("🔔 Güncelleme Bildirimi")
         Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = paleGreen)) {
             Column(Modifier.padding(18.dp)) {

@@ -111,7 +111,10 @@ class MonthlyBackupWorker(
             val receipts = entries.filter { it.receiptFileName != null }.associate {
                 it.entryUuid to ReceiptStorage.read(appContext, checkNotNull(it.receiptFileName))
             }
-            val snapshot = BackupSnapshot(month, entries, dao.allCategories(), receipts)
+            val snapshot = BackupSnapshot(
+                month, entries, dao.allCategories(), receipts,
+                dao.allBudgetLimits(), dao.allPaymentReminders()
+            )
             val archive = ByteArrayOutputStream()
             MonthlyBackupArchive.write(archive, snapshot, zone)
             val target = targetFolder.createFile("application/zip", filename)

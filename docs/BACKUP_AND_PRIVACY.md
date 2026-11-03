@@ -1,12 +1,12 @@
-# EYMEN GELİR — Aylık ZIP yedekleme (v0.3.0)
+# EYMEN GELİR — Aylık ZIP yedekleme (v0.4.0)
 
 ## Kullanım
 Ayarlar → Yedekleme Merkezi → ayı seç → **Seçilen Ayı ZIP Olarak Kaydet**. Android'in dosya seçicisinden uygun konumu seçin. Geri yükleme için ZIP seçin, özetini inceleyin ve onaylayın.
 
 ## Teknik güvenlik
 - Room veritabanı ana kaynaktır; gelir/gider kayıtları kuruş cinsinden tam sayıdır.
-- ZIP `manifest.json`, `records.json` ve varsa `receipts/<UUID>.jpg` dosyalarını içerir. Eski v1 dosyaları desteklenir.
-- Manifest biçim sürümü 2, ay, saat dilimi, kayıt sayısı ile kayıtlar ve fiş fotoğrafları için SHA-256 özetleri içerir.
+- ZIP `manifest.json`, `records.json` ve varsa `receipts/<UUID>.jpg` dosyalarını içerir. Eski v1/v2 dosyaları desteklenir.
+- Manifest biçim sürümü 3, ay, saat dilimi, kayıt sayısı ile kayıtlar ve fiş fotoğrafları için SHA-256 özetleri içerir.
 - En fazla 12 MiB açılmış içerik, 20.000 işlem, 400 kategori kabul edilir.
 - ZIP dosya adları beyaz listeyle doğrulanır; arşiv dosya sistemine açılmaz.
 - Mevcut işlemler silinmez. Aynı UUID'li kayıtlar atlanır. Room transaction ile işlem bütünlüğü korunur.
@@ -17,3 +17,9 @@ Ayarlar → Yedekleme Merkezi → ayı seç → **Seçilen Ayı ZIP Olarak Kayde
 - **ZIP şifreli değil**; başkalarının erişebileceği yerde tutmayın.
 - Fiş/fatura görselleri uygulama özel deposuna JPEG olarak kopyalanır ve ZIP içinde yedeklenir. 2 MiB/görsel, 20 MiB/açılmış ZIP limitleri vardır.
 - Debug APK imzaları derlemeler arasında değişebilir. Önceki v0.1.0 test APK'sında ZIP yedekleme yoktu; uygulamayı kaldırmak verileri silebilir.
+
+## v0.4 ekleri
+- `records.json` içinde `budgets` ve `reminders` dizileri bulunur; bütçeler kategori + limit, hatırlatıcılar kategori + açıklama + ödeme günü + etkinlik alanlarıyla saklanır.
+- İçe aktarım, mevcut kategori bütçelerini değiştirmez; aynı hatırlatıcı ikinci kez eklenmez.
+- Bildirim geçmişi ve izin durumu ZIP'e dahil değildir. İzinler yeniden verilmelidir.
+- Room veritabanı v2→v3 geçişinde yeni tablolar oluşturulur; eski işlem kayıtları silinmez.

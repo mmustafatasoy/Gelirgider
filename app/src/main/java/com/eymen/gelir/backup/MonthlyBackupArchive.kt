@@ -2,6 +2,8 @@ package com.eymen.gelir.backup
 
 import com.eymen.gelir.data.FinanceCategory
 import com.eymen.gelir.data.FinanceEntry
+import com.eymen.gelir.data.BudgetLimit
+import com.eymen.gelir.data.PaymentReminder
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -20,7 +22,9 @@ data class BackupSnapshot(
     val month: YearMonth,
     val entries: List<FinanceEntry>,
     val categories: List<FinanceCategory>,
-    val receipts: Map<String, ByteArray> = emptyMap()
+    val receipts: Map<String, ByteArray> = emptyMap(),
+    val budgets: List<BudgetLimit> = emptyList(),
+    val reminders: List<PaymentReminder> = emptyList()
 )
 
 /**
@@ -30,9 +34,10 @@ data class BackupSnapshot(
  */
 object MonthlyBackupArchive {
     private const val MAGIC = "eymen-gelir-month"
-    private const val FORMAT_VERSION = 2
+    private const val FORMAT_VERSION = 3
     private const val MAX_UNCOMPRESSED_BYTES = 20 * 1024 * 1024
     private const val MAX_PHOTOS = 80
+    private const val MAX_PLANS = 400
     private const val MAX_ENTRIES = 20000
     private const val MAX_CATEGORIES = 400
     private const val MANIFEST = "manifest.json"
@@ -74,7 +79,30 @@ object MonthlyBackupArchive {
                     .put("isDefault", cat.isDefault)
             )
         }
+        require(snapshot.budgets.size <= MAX_PLANS && snapshot.reminders.size <= MAX_PLANS)
+        require(snapshot.budgets.all {
+            it.category.isNotBlank() && it.category.length <= 48 && it.monthlyLimitKurus > 0
+        })
+        require(snapshot.reminders.all {
+            it.category.isNotBlank() && it.category.length <= 48 &&
+                it.title.isNotBlank() && it.title.length <= 80 && it.dayOfMonth in 1..31
+        })
+        val budgetArray = JSONArray()
+        snapshot.budgets.forEach {
+            budgetArray.put(JSONObject()
+                .put("category", it.category)
+                .put("monthlyLimitKurus", it.monthlyLimitKurus))
+        }
+        val reminderArray = JSONArray()
+        snapshot.reminders.forEach {
+            reminderArray.put(JSONObject()
+                .put("category", it.category)
+                .put("title", it.title)
+                .put("dayOfMonth", it.dayOfMonth)
+                .put("enabled", it.enabled))
+        }
         val payload = JSONObject().put("entries", items).put("categories", cats)
+            .put("budgets", budgetArray).put("reminders", reminderArray)
             .toString().toByteArray(StandardCharsets.UTF_8)
         require(payload.size <= MAX_UNCOMPRESSED_BYTES) { "Yedek çok büyük." }
         val receiptHashes = JSONObject()
@@ -222,7 +250,40 @@ object MonthlyBackupArchive {
             }
             receipts[uuid] = bytes
         }
-        return BackupSnapshot(month, entries, categories, receipts)
+        val budgets = mutableListOf<BudgetLimit>()
+        val reminders = mutableListOf<PaymentReminder>()
+        if (archiveVersion >= 3) {
+            val budgetArray = payload.getJSONArray("budgets")
+            val reminderArray = payload.getJSONArray("reminders")
+            require(budgetArray.length() <= MAX_PLANS && reminderArray.length() <= MAX_PLANS)
+            val budgetNames = HashSet<String>()
+            for (i in 0 until budgetArray.length()) {
+                val raw = budgetArray.getJSONObject(i)
+                val category = raw.getString("category")
+                val amount = raw.getLong("monthlyLimitKurus")
+                require(category.isNotBlank() && category.length <= 48 && budgetNames.add(category))
+                require(amount in 1..100_000_000_000_00L)
+                budgets.add(BudgetLimit(category, amount))
+            }
+            val reminderKeys = HashSet<String>()
+            for (i in 0 until reminderArray.length()) {
+                val raw = reminderArray.getJSONObject(i)
+                val category = raw.getString("category")
+                val title = raw.getString("title")
+                val day = raw.getInt("dayOfMonth")
+                val key = "$category|$title|$day"
+                require(category.isNotBlank() && category.length <= 48)
+                require(title.isNotBlank() && title.length <= 80)
+                require(day in 1..31 && reminderKeys.add(key))
+                reminders.add(PaymentReminder(
+                    category = category,
+                    title = title,
+                    dayOfMonth = day,
+                    enabled = raw.getBoolean("enabled")
+                ))
+            }
+        }
+        return BackupSnapshot(month, entries, categories, receipts, budgets, reminders)
     }
 
     private fun matchesMonth(entry: FinanceEntry, month: YearMonth, zone: ZoneId): Boolean =

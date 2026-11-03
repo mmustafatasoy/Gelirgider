@@ -13,6 +13,9 @@ import com.eymen.gelir.data.DEFAULT_CATEGORIES
 import com.eymen.gelir.data.FinanceCategory
 import com.eymen.gelir.data.FinanceDatabase
 import com.eymen.gelir.data.FinanceEntry
+import com.eymen.gelir.data.BudgetLimit
+import com.eymen.gelir.data.PaymentReminder
+import com.eymen.gelir.reminders.ReminderScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,12 +51,18 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val categories: StateFlow<List<FinanceCategory>> = dao.observeCategories()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    val budgetLimits: StateFlow<List<BudgetLimit>> = dao.observeBudgetLimits()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val paymentReminders: StateFlow<List<PaymentReminder>> = dao.observePaymentReminders()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val releaseStatus = MutableStateFlow(ReleaseStatus())
     val operationStatus = MutableStateFlow<String?>(null)
     val backupBusy = MutableStateFlow(false)
     val pendingImport = MutableStateFlow<PendingBackupImport?>(null)
 
     init {
+        ReminderScheduler.ensureScheduled(application)
         viewModelScope.launch(Dispatchers.IO) {
             // Insert any missing default categories while preserving existing user entries.
             DEFAULT_CATEGORIES.forEach { dao.insertCategory(it) }
@@ -141,7 +150,9 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun deleteCategory(category: FinanceCategory) {
         if (category.isDefault) return
         viewModelScope.launch(Dispatchers.IO) {
-            if (entries.value.any { it.category == category.name && it.kind == category.kind }) {
+            if (entries.value.any { it.category == category.name && it.kind == category.kind } ||
+                dao.allBudgetLimits().any { it.category == category.name } ||
+                dao.allPaymentReminders().any { it.category == category.name }) {
                 operationStatus.value = "Bu kategoriye bağlı işlemler var; önce onları düzenleyin."
             } else {
                 dao.deleteCategory(category)
@@ -150,6 +161,57 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+
+    fun setMonthlyBudget(category: String, limitKurus: Long) {
+        if (category.isBlank() || limitKurus <= 0) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                dao.saveBudgetLimit(BudgetLimit(category, limitKurus))
+                operationStatus.value = category + " için aylık bütçe kaydedildi."
+            } catch (error: Exception) {
+                Log.e("EymenGelir", "Budget update failed", error)
+                operationStatus.value = "Bütçe kaydedilemedi."
+            }
+        }
+    }
+
+    fun deleteMonthlyBudget(category: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteBudgetLimit(category)
+            operationStatus.value = "Kategori bütçesi kaldırıldı."
+        }
+    }
+
+    fun addPaymentReminder(category: String, title: String, dayOfMonth: Int) {
+        if (category.isBlank() || title.isBlank() || dayOfMonth !in 1..31) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val added = dao.insertPaymentReminder(
+                    PaymentReminder(category = category, title = title.trim().take(80),
+                        dayOfMonth = dayOfMonth)
+                )
+                operationStatus.value = if (added == -1L) "Bu hatırlatıcı zaten var."
+                    else "Ödeme hatırlatıcısı eklendi."
+                if (added != -1L) ReminderScheduler.checkNow(getApplication())
+            } catch (error: Exception) {
+                operationStatus.value = "Hatırlatıcı kaydedilemedi."
+            }
+        }
+    }
+
+    fun setPaymentReminderEnabled(reminder: PaymentReminder, enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.updatePaymentReminder(reminder.copy(enabled = enabled, lastNotifiedMonth = null))
+            if (enabled) ReminderScheduler.checkNow(getApplication())
+        }
+    }
+
+    fun deletePaymentReminder(reminder: PaymentReminder) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deletePaymentReminder(reminder)
+            operationStatus.value = "Ödeme hatırlatıcısı silindi."
+        }
+    }
 
     /** Exports only the chosen month into a user-selected document. No broad storage permissions. */
     fun exportMonth(uri: Uri, month: YearMonth) {
@@ -168,7 +230,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                         checkNotNull(entry.receiptFileName)
                     )
                 }
-                val snapshot = BackupSnapshot(month, monthly, dao.allCategories(), receipts)
+                val snapshot = BackupSnapshot(
+                    month, monthly, dao.allCategories(), receipts,
+                    dao.allBudgetLimits(), dao.allPaymentReminders()
+                )
                 val resolver = getApplication<Application>().contentResolver
                 val stream = resolver.openOutputStream(uri, "wt")
                     ?: error("Seçilen dosya açılamadı.")
@@ -218,6 +283,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 try {
                     database.withTransaction {
                         snapshot.categories.forEach { dao.insertCategory(it.copy(id = 0)) }
+                        snapshot.budgets.forEach { dao.importBudgetLimit(it) }
+                        snapshot.reminders.forEach {
+                            dao.insertPaymentReminder(it.copy(id = 0, lastNotifiedMonth = null))
+                        }
                         snapshot.entries.forEach { entry ->
                             if (dao.insertEntry(entry.copy(id = 0)) != -1L) {
                                 inserted++
