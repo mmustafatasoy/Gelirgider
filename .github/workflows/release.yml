@@ -27,7 +27,7 @@ jobs:
       EYMEN_RELEASE_STORE_PASSWORD: ${{ secrets.EYMEN_KEYSTORE_PASSWORD }}
       EYMEN_RELEASE_KEY_PASSWORD: ${{ secrets.EYMEN_KEY_PASSWORD }}
       EYMEN_KEYSTORE_BASE64: ${{ secrets.EYMEN_KEYSTORE_BASE64 }}
-      EYMEN_RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/eymen-release.jks
+      EYMEN_RELEASE_KEYSTORE_PATH: /tmp/eymen-gelir-release.jks
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Read main branch
