@@ -63,8 +63,9 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::İmza sırları eksik: Release yayımlanmadı, debug APK de sunulmayacak."
-            echo "GitHub Secrets gereklidir; imzalama anahtarı halka açık depoya konmaz." >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::İmza sırları eksik: İmzalı APK yayımlanamadı. GitHub Secrets gerekli."
+            echo "YAYIN BAŞARISIZ: İmzalama bilgileri eksik. Release oluşturulmadı." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
       - name: Java 17
         if: steps.ready.outputs.ready == 'true' && steps.version.outputs.exists == 'false'
