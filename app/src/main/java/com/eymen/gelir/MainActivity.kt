@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -228,7 +230,7 @@ private fun EymenApp(vm: FinanceViewModel = viewModel()) {
                     )
                     "CATEGORIES" -> CategoriesScreen(categories, vm)
                     "REPORTS" -> ReportsScreen(entries, selectedMonth, { selectedMonth = it })
-                    "SETTINGS" -> SettingsScreen(vm, update)
+                    "SETTINGS" -> SettingsScreen(vm, update, selectedMonth, { selectedMonth = it })
                 }
             }
         }
@@ -614,9 +616,26 @@ private fun ReportsScreen(
     }
 }
 
+
 @Composable
-private fun SettingsScreen(vm: FinanceViewModel, update: ReleaseStatus) {
+private fun SettingsScreen(
+    vm: FinanceViewModel,
+    update: ReleaseStatus,
+    month: YearMonth,
+    onMonthChange: (YearMonth) -> Unit
+) {
     val context = LocalContext.current
+    val pending by vm.pendingImport.collectAsState()
+    val busy by vm.backupBusy.collectAsState()
+
+    val saveZip = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri -> if (uri != null) vm.exportMonth(uri, month) }
+
+    val openZip = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) vm.inspectBackup(uri) }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         HeaderText("Ayarlar ve Hakkında")
         Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White)) {
@@ -629,6 +648,38 @@ private fun SettingsScreen(vm: FinanceViewModel, update: ReleaseStatus) {
                 InfoRow("Yayıncı", "Atasoy Yazılım")
                 InfoRow("Veri konumu", "Telefon (çevrimdışı)")
                 InfoRow("Lisans", "MIT")
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        HeaderText("💾 Yedekleme Merkezi")
+        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Aylık ZIP arşivi", fontWeight = FontWeight.Bold, color = darkGreen)
+                Text("Yedeklemek istediğin ayı seç. ZIP dosyasını telefonunda istediğin klasöre kaydedebilirsin.",
+                    fontSize = 13.sp, color = gray)
+                MonthSelector(month, onMonthChange)
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy,
+                    onClick = {
+                        val filename = "EymenGelir_${month.year}_${month.monthValue.toString().padStart(2, '0')}.zip"
+                        saveZip.launch(filename)
+                    }
+                ) { Text("📦 Seçilen Ayı ZIP Olarak Kaydet") }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy,
+                    onClick = { openZip.launch(arrayOf("application/zip", "application/octet-stream", "application/x-zip-compressed")) }
+                ) { Text("↩ ZIP Dosyasından Geri Yükle") }
+                if (busy) Text("ZIP işleniyor...", color = blue, modifier = Modifier.padding(top = 8.dp))
+                Text(
+                    "Geri yükleme mevcut kayıtları silmez. Aynı işlem ikinci kez içe aktarılmaz. " +
+                        "ZIP dosyaları varsayılan olarak şifresizdir; özel finans verilerinizi güvenli bir yerde saklayın.",
+                    color = gray, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp)
+                )
+                Text("Otomatik aylık yedekleme henüz yok; bu sürümde yedek elle alınır.",
+                    color = red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -654,15 +705,28 @@ private fun SettingsScreen(vm: FinanceViewModel, update: ReleaseStatus) {
                     color = gray, fontSize = 11.sp)
             }
         }
-        Spacer(Modifier.height(16.dp))
-        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-            Column(Modifier.padding(16.dp)) {
-                Text("💾 Yedekleme Merkezi", fontWeight = FontWeight.Bold, color = darkGreen)
-                Text("Aylık ZIP dışa aktarma ve geri yükleme bir sonraki geliştirme aşamasında eklenecek.",
-                    color = gray, fontSize = 13.sp)
-            }
-        }
         Spacer(Modifier.height(80.dp))
+    }
+
+    pending?.let { info ->
+        AlertDialog(
+            onDismissRequest = { vm.cancelPendingImport() },
+            title = { Text("ZIP yedeğini geri yükle?") },
+            text = {
+                Text(
+                    "Ay: ${info.snapshot.month}\n" +
+                        "Kayıt sayısı: ${info.snapshot.entries.size}\n" +
+                        "Kategori sayısı: ${info.snapshot.categories.size}\n\n" +
+                        "Mevcut kayıtların silinmeyecek. Aynı kimliğe sahip kayıtlar atlanacak."
+                )
+            },
+            confirmButton = {
+                Button(onClick = { vm.restorePendingBackup() }) { Text("Geri Yükle") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.cancelPendingImport() }) { Text("Vazgeç") }
+            }
+        )
     }
 }
 

@@ -1,0 +1,190 @@
+package com.eymen.gelir.backup
+
+import com.eymen.gelir.data.FinanceCategory
+import com.eymen.gelir.data.FinanceEntry
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.io.OutputStream
+import java.security.MessageDigest
+import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneId
+import java.nio.charset.StandardCharsets
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
+
+data class BackupSnapshot(
+    val month: YearMonth,
+    val entries: List<FinanceEntry>,
+    val categories: List<FinanceCategory>
+)
+
+/**
+ * EYMEN GELİR monthly archive version 1.
+ * Format: manifest.json (SHA-256 + month + time zone), records.json (entries + categories).
+ * Only two whitelisted entries are accepted; extraction is size-bound and never writes files.
+ */
+object MonthlyBackupArchive {
+    private const val MAGIC = "eymen-gelir-month"
+    private const val FORMAT_VERSION = 1
+    private const val MAX_UNCOMPRESSED_BYTES = 12 * 1024 * 1024
+    private const val MAX_ENTRIES = 20000
+    private const val MAX_CATEGORIES = 400
+    private const val MANIFEST = "manifest.json"
+    private const val RECORDS = "records.json"
+
+    fun write(output: OutputStream, snapshot: BackupSnapshot, timeZone: ZoneId = ZoneId.systemDefault()) {
+        require(snapshot.entries.size <= MAX_ENTRIES && snapshot.categories.size <= MAX_CATEGORIES) {
+            "Yedek sınırı aşıldı."
+        }
+        require(snapshot.entries.all { matchesMonth(it, snapshot.month, timeZone) })
+        val items = JSONArray()
+        snapshot.entries.forEach { entry ->
+            items.put(
+                JSONObject()
+                    .put("uuid", entry.entryUuid)
+                    .put("kind", entry.kind)
+                    .put("category", entry.category)
+                    .put("amountKurus", entry.amountKurus)
+                    .put("description", entry.description)
+                    .put("occurredAt", entry.occurredAt)
+                    .put("createdAt", entry.createdAt)
+            )
+        }
+        val cats = JSONArray()
+        snapshot.categories.forEach { cat ->
+            cats.put(
+                JSONObject()
+                    .put("name", cat.name)
+                    .put("kind", cat.kind)
+                    .put("emoji", cat.emoji)
+                    .put("isDefault", cat.isDefault)
+            )
+        }
+        val payload = JSONObject().put("entries", items).put("categories", cats)
+            .toString().toByteArray(StandardCharsets.UTF_8)
+        require(payload.size <= MAX_UNCOMPRESSED_BYTES) { "Yedek çok büyük." }
+        val manifest = JSONObject()
+            .put("magic", MAGIC)
+            .put("formatVersion", FORMAT_VERSION)
+            .put("month", snapshot.month.toString())
+            .put("timeZone", timeZone.id)
+            .put("entryCount", snapshot.entries.size)
+            .put("recordSha256", sha256(payload))
+            .toString().toByteArray(StandardCharsets.UTF_8)
+        ZipOutputStream(output).use { zip ->
+            writeFile(zip, MANIFEST, manifest)
+            writeFile(zip, RECORDS, payload)
+        }
+    }
+
+    fun read(input: InputStream): BackupSnapshot {
+        val files = LinkedHashMap<String, ByteArray>()
+        var totalBytes = 0
+        ZipInputStream(input).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                require(!entry.isDirectory && entry.name in setOf(MANIFEST, RECORDS)) {
+                    "Tanımlanmayan ZIP içeriği."
+                }
+                require(!files.containsKey(entry.name)) { "Tekrarlı ZIP girişi." }
+                val buffer = ByteArray(8192)
+                val dest = ByteArrayOutputStream()
+                while (true) {
+                    val read = zip.read(buffer)
+                    if (read == -1) break
+                    totalBytes += read
+                    require(totalBytes <= MAX_UNCOMPRESSED_BYTES) { "ZIP dosyası çok büyük." }
+                    dest.write(buffer, 0, read)
+                }
+                files[entry.name] = dest.toByteArray()
+                zip.closeEntry()
+            }
+        }
+        require(files.size == 2 && files.containsKey(MANIFEST) && files.containsKey(RECORDS)) {
+            "Yedek dosyası eksik."
+        }
+        val manifest = JSONObject(String(files.getValue(MANIFEST), StandardCharsets.UTF_8))
+        require(manifest.getString("magic") == MAGIC && manifest.getInt("formatVersion") == FORMAT_VERSION) {
+            "Desteklenmeyen yedek biçimi."
+        }
+        val month = YearMonth.parse(manifest.getString("month"))
+        val zone = ZoneId.of(manifest.getString("timeZone"))
+        val recordBytes = files.getValue(RECORDS)
+        require(sha256(recordBytes).equals(manifest.getString("recordSha256"), ignoreCase = true)) {
+            "ZIP bütünlük doğrulaması başarısız."
+        }
+        val payload = JSONObject(String(recordBytes, StandardCharsets.UTF_8))
+        val entryArray = payload.getJSONArray("entries")
+        val categoryArray = payload.getJSONArray("categories")
+        require(entryArray.length() <= MAX_ENTRIES && categoryArray.length() <= MAX_CATEGORIES)
+        require(entryArray.length() == manifest.getInt("entryCount")) { "Kayıt sayısı uyuşmuyor." }
+        val categories = ArrayList<FinanceCategory>(categoryArray.length())
+        for (index in 0 until categoryArray.length()) {
+            val raw = categoryArray.getJSONObject(index)
+            val kind = raw.getString("kind")
+            val name = raw.getString("name").trim()
+            val emoji = raw.getString("emoji")
+            require(kind == "INCOME" || kind == "EXPENSE")
+            require(name.isNotEmpty() && name.length <= 48 && emoji.length <= 24)
+            categories.add(
+                FinanceCategory(
+                    name = name,
+                    kind = kind,
+                    emoji = emoji,
+                    isDefault = raw.optBoolean("isDefault", false)
+                )
+            )
+        }
+        val entries = ArrayList<FinanceEntry>(entryArray.length())
+        val uuids = HashSet<String>()
+        for (index in 0 until entryArray.length()) {
+            val raw = entryArray.getJSONObject(index)
+            val uuid = raw.getString("uuid")
+            val kind = raw.getString("kind")
+            val category = raw.getString("category").trim()
+            val description = raw.getString("description")
+            val amountKurus = raw.getLong("amountKurus")
+            val occurredAt = raw.getLong("occurredAt")
+            val createdAt = raw.getLong("createdAt")
+            require(uuid.matches(Regex("[0-9a-fA-F-]{36}")) && uuids.add(uuid))
+            require(kind == "INCOME" || kind == "EXPENSE")
+            require(category.isNotEmpty() && category.length <= 48)
+            require(description.length <= 500)
+            require(amountKurus > 0 && amountKurus <= 100_000_000_000_00L)
+            require(occurredAt >= 0 && createdAt >= 0)
+            val entry = FinanceEntry(
+                entryUuid = uuid,
+                kind = kind,
+                category = category,
+                amountKurus = amountKurus,
+                description = description,
+                occurredAt = occurredAt,
+                createdAt = createdAt
+            )
+            require(matchesMonth(entry, month, zone)) { "Yedekte farklı bir ayın kaydı bulundu." }
+            entries.add(entry)
+        }
+        // A saved entry must have a matching category, even if it is no longer used locally.
+        require(entries.all { entry ->
+            categories.any { it.kind == entry.kind && it.name == entry.category }
+        }) { "Yedekte bazı kategoriler eksik." }
+        return BackupSnapshot(month, entries, categories)
+    }
+
+    private fun matchesMonth(entry: FinanceEntry, month: YearMonth, zone: ZoneId): Boolean =
+        YearMonth.from(Instant.ofEpochMilli(entry.occurredAt).atZone(zone)) == month
+
+    private fun writeFile(zip: ZipOutputStream, name: String, payload: ByteArray) {
+        zip.putNextEntry(ZipEntry(name).also { it.time = 0L })
+        zip.write(payload)
+        zip.closeEntry()
+    }
+
+    private fun sha256(content: ByteArray): String = MessageDigest
+        .getInstance("SHA-256").digest(content)
+        .joinToString("") { "%02x".format(it) }
+}

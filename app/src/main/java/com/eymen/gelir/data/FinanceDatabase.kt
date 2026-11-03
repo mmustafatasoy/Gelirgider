@@ -44,6 +44,12 @@ interface FinanceDao {
     @Query("SELECT * FROM categories ORDER BY isDefault DESC, name COLLATE NOCASE")
     fun observeCategories(): Flow<List<FinanceCategory>>
 
+    @Query("SELECT * FROM entries ORDER BY occurredAt DESC, id DESC")
+    suspend fun allEntries(): List<FinanceEntry>
+
+    @Query("SELECT * FROM categories ORDER BY name COLLATE NOCASE")
+    suspend fun allCategories(): List<FinanceCategory>
+
     @Query("SELECT COUNT(*) FROM categories")
     suspend fun countCategories(): Int
 

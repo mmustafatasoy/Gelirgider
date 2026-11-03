@@ -1,6 +1,10 @@
 package com.eymen.gelir
 
 import android.app.Application
+import android.net.Uri
+import androidx.room.withTransaction
+import com.eymen.gelir.backup.BackupSnapshot
+import com.eymen.gelir.backup.MonthlyBackupArchive
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,6 +23,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
+import java.time.YearMonth
+import java.time.ZoneId
 
 data class ReleaseStatus(
     val isChecking: Boolean = false,
@@ -30,8 +36,11 @@ data class ReleaseStatus(
     val message: String = ""
 )
 
+data class PendingBackupImport(val snapshot: BackupSnapshot)
+
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
-    private val dao = FinanceDatabase.get(application).financeDao()
+    private val database = FinanceDatabase.get(application)
+    private val dao = database.financeDao()
 
     val entries: StateFlow<List<FinanceEntry>> = dao.observeEntries()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -40,6 +49,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     val releaseStatus = MutableStateFlow(ReleaseStatus())
     val operationStatus = MutableStateFlow<String?>(null)
+    val backupBusy = MutableStateFlow(false)
+    val pendingImport = MutableStateFlow<PendingBackupImport?>(null)
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -118,6 +129,80 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             } else {
                 dao.deleteCategory(category)
                 operationStatus.value = "Kategori silindi."
+            }
+        }
+    }
+
+
+    /** Exports only the chosen month into a user-selected document. No broad storage permissions. */
+    fun exportMonth(uri: Uri, month: YearMonth) {
+        if (backupBusy.value) return
+        backupBusy.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val all = dao.allEntries()
+                val zone = ZoneId.systemDefault()
+                val monthly = all.filter {
+                    YearMonth.from(java.time.Instant.ofEpochMilli(it.occurredAt).atZone(zone)) == month
+                }
+                val snapshot = BackupSnapshot(month, monthly, dao.allCategories())
+                val resolver = getApplication<Application>().contentResolver
+                val stream = resolver.openOutputStream(uri, "wt")
+                    ?: error("Seçilen dosya açılamadı.")
+                stream.use { MonthlyBackupArchive.write(it, snapshot, zone) }
+                operationStatus.value = "${month} yedeği oluşturuldu (${monthly.size} işlem)."
+            } catch (error: Exception) {
+                Log.e("EymenGelir", "ZIP export failed", error)
+                operationStatus.value = "ZIP oluşturulamadı. Dosya ve depolama izinlerini kontrol edin."
+            } finally {
+                backupBusy.value = false
+            }
+        }
+    }
+
+    /** Checks the full archive before asking the user for explicit confirmation. */
+    fun inspectBackup(uri: Uri) {
+        if (backupBusy.value) return
+        backupBusy.value = true
+        pendingImport.value = null
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val resolver = getApplication<Application>().contentResolver
+                val stream = resolver.openInputStream(uri) ?: error("ZIP açılamadı.")
+                val parsed = stream.use { MonthlyBackupArchive.read(it) }
+                pendingImport.value = PendingBackupImport(parsed)
+            } catch (error: Exception) {
+                Log.e("EymenGelir", "ZIP verification failed", error)
+                operationStatus.value = "ZIP doğrulanamadı. Dosya bozuk ya da desteklenmiyor."
+            } finally {
+                backupBusy.value = false
+            }
+        }
+    }
+
+    fun cancelPendingImport() { pendingImport.value = null }
+
+    /** Safe merge: existing data is never deleted or overwritten; duplicate UUIDs are ignored. */
+    fun restorePendingBackup() {
+        if (backupBusy.value) return
+        val snapshot = pendingImport.value?.snapshot ?: return
+        pendingImport.value = null
+        backupBusy.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                var inserted = 0
+                database.withTransaction {
+                    snapshot.categories.forEach { dao.insertCategory(it.copy(id = 0)) }
+                    snapshot.entries.forEach { entry ->
+                        if (dao.insertEntry(entry.copy(id = 0)) != -1L) inserted++
+                    }
+                }
+                operationStatus.value = "${snapshot.month}: ${inserted} yeni işlem geri yüklendi. Mevcut kayıtlar korundu."
+            } catch (error: Exception) {
+                Log.e("EymenGelir", "ZIP import failed", error)
+                operationStatus.value = "Geri yükleme başarısız. Mevcut veriler değiştirilmedi."
+            } finally {
+                backupBusy.value = false
             }
         }
     }
