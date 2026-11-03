@@ -107,13 +107,21 @@ fun RecoveryCodeSheet(
         Text(title, fontWeight = FontWeight.Bold, fontSize = 19.sp)
         Text("Bu sekiz kod yalnızca şimdi gösterilir. Her kod tek kullanımlıktır.",
             color = helperGray, fontSize = 13.sp)
-        SelectionContainer {
-            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                codes.forEachIndexed { index, code ->
-                    Text("${index + 1}.  $code", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            codes.forEachIndexed { index, code ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${index + 1}.", fontSize = 12.sp, color = helperGray)
+                    Spacer(Modifier.width(8.dp))
+                    Box(Modifier.weight(1f)) {
+                        SelectionContainer {
+                            Text(code, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                    }
                 }
             }
         }
+        Text("Kopyalarken yalnızca kodu seç. Sıra numarası koda dahil değil.",
+            fontSize = 12.sp, color = helperGray)
         Text("Kodları telefon dışında güvenli bir yere yaz. Kod ve şifreler sunucuya gönderilmez.",
             color = helperGray, fontSize = 12.sp)
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -263,7 +271,7 @@ private fun LocalAuthenticationScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 )
                                 OutlinedTextField(
-                                    recovery, { recovery = it.take(42) },
+                                    recovery, { recovery = it.take(65) },
                                     label = { Text("Kurtarma kodu") }, singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -279,6 +287,7 @@ private fun LocalAuthenticationScreen(
                                                 message = "Kullanıcı adı veya kurtarma kodu geçersiz."
                                             } else {
                                                 temporary = newTemp
+                                                password = newTemp
                                                 recovery = ""
                                                 route = "TEMP"
                                             }
@@ -288,7 +297,7 @@ private fun LocalAuthenticationScreen(
                                 TextButton(onClick = { route = "LOGIN"; message = "" }) { Text("Girişe Dön") }
                             }
                             "TEMP" -> {
-                                Text("Geçici şifren oluşturuldu", fontWeight = FontWeight.Bold,
+                                Text("Yeni kalıcı şifre oluştur", fontWeight = FontWeight.Bold,
                                     fontSize = 20.sp)
                                 if (temporary.isNotBlank()) {
                                     Text("Bu geçici şifre yalnızca şimdi gösterilir.", color = helperGray, fontSize = 12.sp)
@@ -300,7 +309,7 @@ private fun LocalAuthenticationScreen(
                                         "bir kullanılmamış kurtarma koduyla yeniden oluştur.",
                                         color = helperGray, fontSize = 12.sp)
                                 }
-                                PasswordInput(password, { password = it }, "Geçici şifre")
+                                PasswordInput(password, { password = it }, "Geçici şifre (otomatik dolduruldu)")
                                 HorizontalDivider()
                                 PasswordInput(newPassword, { newPassword = it }, "Yeni kalıcı şifre (en az 10)")
                                 PasswordInput(newConfirm, { newConfirm = it }, "Yeni şifre tekrar")

@@ -23,6 +23,24 @@ class LocalAccountCryptoTest {
         assertEquals(hash1, hash2)
     }
 
+    @Test fun numberedAndUnicodeSeparatedCodePastesAreAccepted() {
+        val code = "AB12-CD34-EF56-7890-ABCD-EF12"
+        val salt = ByteArray(16) { 7 }
+        val digest = LocalAccountCrypto.recoveryDigest(code, salt)
+        assertEquals(digest, LocalAccountCrypto.recoveryDigest("1.  " + code, salt))
+        assertEquals(digest, LocalAccountCrypto.recoveryDigest("2) " + code, salt))
+        assertEquals(digest, LocalAccountCrypto.recoveryDigest(code.replace("-", "–"), salt))
+        assertEquals(digest, LocalAccountCrypto.recoveryDigest(code.replace("-", " "), salt))
+        assertEquals(digest, LocalAccountCrypto.recoveryDigest(code.lowercase(), salt))
+    }
+
+    @Test fun wrongCodeStillProducesDifferentDigest() {
+        val salt = ByteArray(16) { 4 }
+        val good = LocalAccountCrypto.recoveryDigest("AB12-CD34-EF56-7890-ABCD-EF12", salt)
+        val bad = LocalAccountCrypto.recoveryDigest("AB12-CD34-EF56-7890-ABCD-EF13", salt)
+        assertFalse(LocalAccountCrypto.equalsConstantTime(LocalAccountCrypto.fromHex(good), LocalAccountCrypto.fromHex(bad)))
+    }
+
     @Test fun temporaryPasswordNotEqualRecoveryCode() {
         val temp = LocalAccountCrypto.newTemporaryPassword()
         assertEquals(39, temp.length)

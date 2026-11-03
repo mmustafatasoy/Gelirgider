@@ -43,8 +43,12 @@ object LocalAccountCrypto {
 
     fun equalsConstantTime(a: ByteArray, b: ByteArray): Boolean = MessageDigest.isEqual(a, b)
 
+    /** Strip list numbering (e.g. "1. CODE") and keyboard separators before validation. */
     fun canonicalRecoveryCode(code: String): String =
-        code.trim().uppercase(java.util.Locale.ROOT).replace("-", "").replace(" ", "")
+        code.trim()
+            .replace(Regex("""^[1-8][.)]\s*"""), "")
+            .uppercase(java.util.Locale.ROOT)
+            .replace(Regex("""[\s\p{Zs}\p{Pd}]"""), "")
 
     /** 96 bits entropy; six groups of four hex digits for printable offline recovery. */
     fun newRecoveryCode(): String =
