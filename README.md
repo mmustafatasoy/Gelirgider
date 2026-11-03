@@ -17,7 +17,10 @@ https://github.com/mmustafatasoy/Gelirgider/actions/runs/41678303239
 **v0.5.0 önceki test APK:**
 https://github.com/mmustafatasoy/Gelirgider/actions/runs/41680420362
 
-**v0.6.0 test APK:** Bu sürümün GitHub Actions derlemesi tamamlandıktan sonra bağlantısı güncellenecek.
+**v0.6.0 başarılı TEST APK:**
+https://github.com/mmustafatasoy/Gelirgider/actions/runs/41684805044
+
+**İmzalı kararlı Release (henüz yayımlanmadı):** GitHub Secrets ayarları ve manuel yayın çalışması gerekir. [Adımlar](docs/SIGNED_RELEASE.md).
 
 Derleme sayfasını açıp **Artifacts → EYMEN-GELIR-debug-apk** üzerinden ZIP'i indir; ZIP içindeki `app-debug.apk` dosyasını telefona yükle. GitHub artefakt indirmesi için giriş gerekebilir.
 

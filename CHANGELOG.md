@@ -6,6 +6,7 @@
 - Room v4 migration: alıcı adı için yeni alan, önceki finans kayıtları korunur.
 - ZIP format v4: alıcı adı dahil; eski ZIP biçimleri okunur.
 - İmzalı ve kararlı GitHub Releases yayımlama iş akışı hazırlanır; kalıcı imzalama anahtarı GitHub Secrets'te olmadan yayın durdurulur.
+- GitHub Actions test derlemesi ve APK oluşturma başarılı: https://github.com/mmustafatasoy/Gelirgider/actions/runs/41684805044
 - Kararlı sürüm: Henüz yayımlanmadı (imzalama sırları gerekiyor).
 
 ## v0.5.0 (3 Kasım 2026)
